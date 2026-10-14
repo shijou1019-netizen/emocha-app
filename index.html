@@ -1,0 +1,2439 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <!-- CSP（2026-10-14）: GitHub Pages はヘッダーを出せないので meta で書く。
+       script は同じ場所のファイルだけ（app.js・vendor/supabase.js。インラインの script は無し）、通信先は自分の Supabase だけ。
+       style は画面の中の style 属性を使うので 'unsafe-inline' を許す。img は配信者のアイコン（外部の https）を出すため https: を許す。
+       frame-ancestors は meta では効かないので、app.js の先頭で「枠の中なら抜け出す」をしている -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://kpldczfykhjlkonwvucb.supabase.co; font-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'" />
+  <meta name="theme-color" content="#f6f1ff" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./WEBアプリアイコン.png" />
+  <link rel="apple-touch-icon" href="./WEBアプリアイコン.png" />
+
+  <title>えもちゃっとライブ - データ同期中</title>
+
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --surface: #1c1c1c;
+      --surface-2: #242424;
+      --border: #2e2e2e;
+      --text: #f5f5f5;
+      --sub-text: #bdbdbd;
+      --text-sub: #a8a8a8;
+
+      --accent: #ff7a18;
+      --accent-2: #ffcf33;
+      --accent-pink: #ff3f81;
+      --success: #54ff9f;
+      --danger: #ff4d4d;
+      --gold: #ffd75e;
+      --silver: #d8d8e0;
+      --bronze: #e2a25c;
+
+      --nav-bg: rgba(20, 20, 20, 0.92);
+      --card-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 10px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-t: env(safe-area-inset-top, 0px);
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f2f2f5;
+      --surface: #ffffff;
+      --surface-2: #f5f5f8;
+      --border: #e1e1e6;
+      --text: #1b1b1f;
+      --sub-text: #6b6b72;
+      --text-sub: #6b6b72;
+      --nav-bg: rgba(255, 255, 255, 0.92);
+      --card-shadow: 0 12px 30px rgba(20, 20, 30, 0.08);
+    }
+
+    :root[data-theme="cream"] {
+      --bg: #f6efdc;
+      --surface: #fffaf0;
+      --surface-2: #f3e9cd;
+      --border: #e6d8b8;
+      --text: #3b2f1e;
+      --sub-text: #8a7b5c;
+      --text-sub: #8a7b5c;
+      --nav-bg: rgba(246, 239, 220, 0.92);
+      --card-shadow: 0 12px 30px rgba(90, 70, 30, 0.12);
+    }
+
+    :root[data-theme="gray"] {
+      --bg: #2c2c2c;
+      --surface: #3a3a3a;
+      --surface-2: #454545;
+      --border: #505050;
+      --text: #f2f2f2;
+      --sub-text: #bdbdbd;
+      --text-sub: #bdbdbd;
+      --nav-bg: rgba(44, 44, 44, 0.92);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    /* [hidden] は、同じ要素に display を指定するクラス（.auth-user-row 等）があると
+       UA の既定スタイルより弱くて負けてしまうため、常に勝つようにしておく */
+    [hidden] {
+      display: none !important;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Hiragino Kaku Gothic ProN",
+        "Hiragino Sans",
+        "Yu Gothic",
+        sans-serif;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    body {
+      min-height: 100dvh;
+      overflow: hidden;
+    }
+
+    button,
+    select,
+    input {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* ============================================================
+     * 読み込み画面「Now Loading」（2026-10-09 依頼者「ハムスターはもう使わない。nowloading をえもちゃ色で」）
+     *   淡いラベンダーの地（ダッシュボードと同じ）に、えもちゃの色（ピンク → 青 → すみれ）が流れる文字と、跳ねる 3 つの点・細い帯。
+     *   前の回し車のハムスター・火花（canvas）は削除した
+     * ============================================================ */
+    #loadingScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse 90% 40% at 10% 0%, rgba(240, 83, 155, 0.22), transparent 70%),
+        radial-gradient(ellipse 80% 35% at 100% 30%, rgba(106, 124, 245, 0.22), transparent 70%),
+        radial-gradient(ellipse 90% 40% at 50% 105%, rgba(139, 92, 246, 0.25), transparent 70%),
+        linear-gradient(180deg, #f6f1ff 0%, #efe8ff 55%, #e9e0ff 100%);
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity 0.65s ease,
+        visibility 0.65s ease;
+    }
+
+    #loadingScreen.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: min(92vw, 420px);
+    }
+
+    .now-loading {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 0;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+
+    /* 文字の中を、えもちゃの色がゆっくり流れる */
+    .now-loading-word {
+      background: linear-gradient(90deg, #f0539b 0%, #6a7cf5 33%, #8b5cf6 66%, #f0539b 100%);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: now-loading-flow 2.4s linear infinite;
+    }
+
+    @keyframes now-loading-flow {
+      from { background-position: 0% 50%; }
+      to { background-position: 150% 50%; }
+    }
+
+    /* 跳ねる 3 つの点（ピンク・青・すみれ） */
+    .now-loading-dots {
+      display: inline-flex;
+      gap: 5px;
+    }
+
+    .now-loading-dots i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f0539b;
+      animation: now-loading-hop 1s ease-in-out infinite;
+    }
+
+    .now-loading-dots i:nth-child(2) { background: #6a7cf5; animation-delay: 0.15s; }
+    .now-loading-dots i:nth-child(3) { background: #8b5cf6; animation-delay: 0.3s; }
+
+    @keyframes now-loading-hop {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-10px); }
+    }
+
+    /* 細い帯（えもちゃの色の光が左から右へ流れ続ける） */
+    .now-loading-bar {
+      position: relative;
+      width: 180px;
+      height: 4px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(106, 91, 214, 0.15);
+    }
+
+    .now-loading-bar::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -40%;
+      width: 40%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f0539b, #6a7cf5, #8b5cf6);
+      animation: now-loading-bar 1.3s ease-in-out infinite;
+    }
+
+    @keyframes now-loading-bar {
+      to { left: 100%; }
+    }
+
+    .loading-sub {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #5a5390;
+    }
+
+    /* 「同期中…」「認証状態を確認中…」の文字の点滅（.sync-status・.login-status が使う。前は読み込み画面の文字にも使っていた） */
+    @keyframes loading-blink {
+      from { opacity: 0.35; }
+      to { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .now-loading-word,
+      .now-loading-dots i,
+      .now-loading-bar::after {
+        animation-duration: 3s;
+      }
+    }
+    /* ============================================================
+     * ダッシュボード（ボトムタブ PWA）
+     * ============================================================ */
+    #dashboard {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .view {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding:
+        max(18px, var(--safe-t))
+        18px
+        24px;
+      scrollbar-width: thin;
+    }
+
+    .view[hidden] {
+      display: none;
+    }
+
+    .view-title {
+      margin: 4px 0 16px;
+      font-size: 19px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .view-subtitle {
+      margin: -10px 0 16px;
+      font-size: 12.5px;
+      color: var(--text-sub);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow);
+    }
+
+    /* ---------- ホーム ---------- */
+    .mascot-spot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 0 18px;
+    }
+
+    /* running-mascot.png は 6コマ横並び・1コマ 362x724（縦長）。先頭コマだけを静止表示して見守りポーズにする */
+    .mascot-sprite {
+      width: 60px;
+      height: 120px;
+      background-image: url("./running-mascot.png");
+      background-repeat: no-repeat;
+      background-size: 360px 120px;
+      background-position: 0 0;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      filter: drop-shadow(0 6px 14px rgba(255, 122, 24, 0.25));
+    }
+
+    .mascot-caption {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--text-sub);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .sync-status {
+      margin: 0 0 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-align: center;
+      color: var(--text-sub);
+    }
+
+    .sync-status.is-loading {
+      animation: loading-blink 1s ease-in-out infinite alternate;
+    }
+
+    .sync-status.is-error {
+      color: var(--danger);
+      animation: none;
+    }
+
+    .sync-status .retry-link {
+      margin-left: 6px;
+      border: none;
+      background: none;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+      font-weight: 800;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .today-summary {
+      margin: -6px 0 14px;
+      font-size: 11.5px;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .stat-card {
+      grid-column: span 1;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-card.span-2 {
+      grid-column: span 2;
+    }
+
+    .stat-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .stat-value {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--text-sub);
+      font-weight: 600;
+    }
+
+    .card-section {
+      padding: 18px 16px;
+      margin-bottom: 14px;
+    }
+
+    .card-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .card-section-head h3 {
+      margin: 0;
+      font-size: 14.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tier-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.03em;
+    }
+
+    .tier-badge[data-tier="gold"] {
+      background: linear-gradient(135deg, var(--gold), #ffb84d);
+      color: #4a3200;
+    }
+
+    .tier-badge[data-tier="silver"] {
+      background: linear-gradient(135deg, var(--silver), #b9b9c6);
+      color: #33333c;
+    }
+
+    .tier-badge[data-tier="bronze"] {
+      background: linear-gradient(135deg, var(--bronze), #c07a3e);
+      color: #3a2100;
+    }
+
+    .tier-badge[data-tier="none"] {
+      background: var(--surface-2);
+      color: var(--text-sub);
+    }
+
+    .streak-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .streak-count {
+      font-size: 30px;
+      font-weight: 900;
+      color: var(--accent);
+    }
+
+    .streak-unit {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-sub);
+    }
+
+    .streak-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .streak-track {
+      margin-top: 12px;
+      display: flex;
+      gap: 5px;
+    }
+
+    .streak-dot {
+      flex: 1;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .streak-dot.is-filled {
+      background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    }
+
+    /* 獲得ポイント実績（残高ではなく「これまでに獲得した分」だけを見せる） */
+    .points-total {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .points-total-value {
+      font-size: 34px;
+      font-weight: 900;
+      line-height: 1.1;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .points-total-unit {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-sub);
+    }
+
+    .points-total-label {
+      margin: 2px 0 12px;
+      font-size: 11.5px;
+      color: var(--text-sub);
+    }
+
+    .points-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .points-split-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+    }
+
+    .points-split-value {
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .points-split-label {
+      font-size: 10.5px;
+      color: var(--text-sub);
+    }
+
+    .points-channel-title {
+      margin: 16px 0 8px;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+
+    .points-channel-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .points-channel-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+    }
+
+    .points-channel-avatar {
+      flex: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .points-channel-name {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .points-channel-pt {
+      flex: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .points-empty {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    /* ---------- 推し活グラフ（ログ＆グラフ） ---------- */
+    .seg {
+      display: flex;
+      gap: 4px;
+      padding: 3px;
+      margin-bottom: 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .seg-btn {
+      flex: 1;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 6px;
+      font-size: 12.5px;
+      font-weight: 800;
+      color: var(--text-sub);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .seg-sm .seg-btn {
+      padding: 6px 6px;
+      font-size: 12px;
+    }
+
+    .seg-btn.is-active {
+      color: #3a1e00;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    }
+
+    .graph-summary {
+      margin: 6px 0 2px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .graph-summary small {
+      margin-left: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-sub);
+    }
+
+    .graph-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      touch-action: manipulation;
+    }
+
+    .graph-svg .g-grid { stroke: var(--border); stroke-width: 1; }
+    .graph-svg .g-label { fill: var(--text-sub); font-size: 9px; }
+    .graph-svg .g-bar { cursor: pointer; }
+    .graph-svg .g-bar.is-selected { filter: brightness(1.25); }
+    .graph-svg .g-hit { fill: transparent; cursor: pointer; }
+
+    .graph-legend {
+      display: flex;
+      gap: 12px;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .graph-legend i {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 4px;
+      border-radius: 2px;
+      vertical-align: -1px;
+    }
+
+    .graph-detail {
+      margin: 8px 0 0;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    .wk-chart {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      align-items: end;
+      height: 120px;
+    }
+
+    .wk-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 3px;
+      height: 100%;
+    }
+
+    .wk-val { font-size: 9px; color: var(--text-sub); white-space: nowrap; }
+
+    .wk-bar {
+      width: 100%;
+      max-width: 26px;
+      min-height: 3px;
+      border-radius: 6px 6px 3px 3px;
+      background: linear-gradient(180deg, var(--accent-2), var(--accent));
+      opacity: 0.55;
+    }
+
+    .wk-col.is-top .wk-bar { opacity: 1; box-shadow: 0 0 10px rgba(255, 160, 40, 0.5); }
+    .wk-day { font-size: 11px; font-weight: 800; }
+
+    .bd-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+    .bd-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 8px; }
+
+    .bd-name {
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bd-track { height: 12px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+
+    .bd-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    }
+
+    .bd-val { font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+
+    .donut-row { display: flex; align-items: center; gap: 16px; }
+    .donut-svg { flex: none; width: 112px; height: 112px; }
+    .donut-svg .d-center { fill: var(--text); font-size: 9px; font-weight: 800; }
+    .donut-svg .d-sub { fill: var(--text-sub); font-size: 7px; }
+    .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+    .donut-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
+    .donut-legend b { margin-left: 4px; }
+
+    .seg-scroll {
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .seg-scroll::-webkit-scrollbar { display: none; }
+    .seg-scroll .seg-btn { flex: 0 0 auto; padding: 8px 12px; white-space: nowrap; }
+
+    .viz-svg .v-shape { cursor: pointer; transition: filter 0.15s ease; }
+    .viz-svg .v-shape:hover { filter: brightness(1.2); }
+    .viz-svg .v-shape.is-selected { stroke: #fff; stroke-width: 2; }
+    .viz-svg .v-shape.is-today { stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.5; }
+    .viz-svg .v-label { fill: var(--text-sub); font-size: 9px; pointer-events: none; }
+    .viz-svg .v-label-on { fill: #1b1200; font-size: 11px; font-weight: 800; }
+    .viz-svg .v-label-sub { font-size: 9.5px; font-weight: 700; }
+    .seg-wrap { flex-wrap: wrap; border-radius: 20px; }
+    .seg-wrap .seg-btn { flex: 1 1 auto; padding: 6px 8px; font-size: 11.5px; white-space: nowrap; }
+    .viz-svg .v-label-tiny { font-size: 5.5px; fill: rgba(255, 255, 255, 0.75); stroke: rgba(10, 12, 30, 0.7); stroke-width: 1.5px; paint-order: stroke; }
+    .viz-svg .v-label-big { fill: var(--text); font-size: 17px; font-weight: 800; pointer-events: none; }
+    .viz-svg .v-label-day { fill: var(--text); font-size: 11px; font-weight: 800; }
+
+    .solid-svg {
+      touch-action: pan-y; /* 縦のスクロールはそのまま、横のドラッグは立体を回すのに使う */
+      cursor: grab;
+      user-select: none;
+    }
+
+    .solid-svg polygon { cursor: pointer; }
+
+    /* ネオン: 線の周りに光がにじむ */
+    .solid-neon { filter: drop-shadow(0 0 4px rgba(150, 140, 255, 0.85)); }
+
+    /* ラベルは柱と重なっても読めるよう、文字の周りに暗い縁取りを付ける */
+    .solid-svg text {
+      paint-order: stroke;
+      stroke: rgba(10, 12, 30, 0.9);
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }
+
+    .badge-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+    .badge-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+    }
+
+    .badge-name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge-icons { display: flex; gap: 10px; }
+    .badge-icon { font-size: 20px; filter: grayscale(1); opacity: 0.22; }
+    .badge-icon.is-earned { filter: none; opacity: 1; }
+
+    .led-row { display: flex; flex-direction: column; gap: 4px; }
+    .led-name { margin-bottom: 1px; }
+    .led-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+    .led-fill.is-earned { background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+    .led-fill.is-spent { background: linear-gradient(90deg, #7c5cff, #5b9bff); }
+
+    .timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+    .timeline-item { position: relative; display: flex; flex-direction: column; gap: 1px; }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -20px;
+      top: 4px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    }
+
+    .timeline-date { font-size: 11px; font-weight: 800; color: var(--text-sub); }
+    .timeline-name { font-size: 13px; font-weight: 700; }
+
+    /* ---------- 立体グラフ: 夜のデジタル展示空間 ----------
+       画面の幅いっぱいに広げ、グラフを主役にする。色は白・シアン・青紫が中心。オレンジはポイントなど意味のある所だけ */
+    #dashboard #solidCard.solid-stage {
+      --sx-text: #f5f7ff;
+      --sx-sub: #aeb7dc;
+      --sx-cyan: #62e7ff;
+      --sx-violet: #8378ff;
+      --sx-accent: #ff9f35;
+      position: relative;
+      overflow: hidden;
+      margin: 0 -18px 14px;
+      padding: 24px 0 18px;
+      border: 0;
+      border-top: 1px solid rgba(160, 170, 255, 0.12);
+      border-bottom: 1px solid rgba(160, 170, 255, 0.1);
+      border-radius: 28px;
+      color: var(--sx-text);
+      background:
+        radial-gradient(circle at 80% 15%, rgba(120, 95, 255, 0.16), transparent 34%),
+        radial-gradient(circle at 15% 45%, rgba(60, 220, 255, 0.10), transparent 30%),
+        radial-gradient(circle at 70% 70%, rgba(255, 160, 60, 0.06), transparent 25%),
+        linear-gradient(180deg, #171d52 0%, #10163d 45%, #090d26 100%);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .solid-head { padding: 0 20px; text-align: center; }
+
+    .solid-head h3 {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--sx-text);
+      text-shadow: 0 0 18px rgba(98, 231, 255, 0.35);
+    }
+
+    .solid-head p { margin: 5px 0 0; font-size: 12px; color: var(--sx-sub); }
+
+    .solid-controls { padding: 0 14px; }
+    .solid-head + .solid-controls { margin-top: 16px; }
+
+    /* ガラス調の切り替え（薄い半透明・細い縁・ごく控えめなぼかし） */
+    #solidCard .solid-seg {
+      gap: 2px;
+      margin: 0 0 8px;
+      padding: 4px;
+      border: 1px solid rgba(170, 180, 255, 0.16);
+      background: rgba(255, 255, 255, 0.045);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+
+    #solidCard .solid-seg .seg-btn {
+      flex: 1 1 0;
+      padding: 10px 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--sx-sub);
+      background: transparent;
+    }
+
+    /* 切り替えは横にスクロールさせず、全部が一度に見えるグリッドにする */
+    #solidCard .solid-seg-grid { display: grid; gap: 2px; border-radius: 22px; }
+    #solidType.solid-seg-grid { grid-template-columns: repeat(5, 1fr); }
+    #solidLook.solid-seg-grid { grid-template-columns: repeat(5, 1fr); }
+    #solidCard #solidType.solid-seg-grid .seg-btn { flex: none; min-width: 0; padding: 9px 2px; font-size: 11.5px; letter-spacing: 0; white-space: nowrap; }
+    #solidCard #solidLook.solid-seg-grid .seg-btn { flex: none; min-width: 0; padding: 8px 0; font-size: 10.5px; letter-spacing: 0; white-space: nowrap; }
+    #solidCard { -webkit-user-select: none; user-select: none; }
+    #solidCard .solid-seg-scroll { overflow-x: auto; scrollbar-width: none; }
+    #solidCard .solid-seg-scroll::-webkit-scrollbar { display: none; }
+    #solidCard .solid-seg-scroll .seg-btn { flex: 0 0 auto; padding: 10px 14px; }
+    #solidCard .solid-seg-sm .seg-btn { flex: 0 0 auto; padding: 7px 12px; font-size: 11.5px; }
+    #solidCard .solid-metrics .seg-btn { padding: 12px 2px; font-size: 12.5px; }
+
+    #solidCard .seg-btn.is-active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(98, 231, 255, 0.2), rgba(131, 120, 255, 0.42));
+      box-shadow: inset 0 0 0 1px rgba(205, 220, 255, 0.38), 0 0 16px -6px rgba(98, 231, 255, 0.6);
+    }
+
+    /* 上部のサマリー（今月と先月比） */
+    .solid-summary {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 6px 16px 0;
+      padding: 12px 16px;
+      border: 1px solid rgba(170, 180, 255, 0.14);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.045);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+
+    .solid-sum-item { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .solid-sum-sep { width: 1px; align-self: stretch; background: rgba(170, 180, 255, 0.18); }
+    .solid-sum-label { font-size: 11px; color: var(--sx-sub); }
+    .solid-sum-value { font-size: 19px; font-weight: 800; color: var(--sx-text); white-space: nowrap; }
+    .solid-sum-value.is-up { color: var(--sx-cyan); }
+    .solid-sum-value.is-down { color: #c3b8ff; }
+
+    /* 立体グラフ本体: 背面にシアン・紫・ごく少量のオレンジのぼかし光を置いて、柱が浮いて見えるようにする */
+    .solid-canvas { position: relative; margin: 8px 0 6px; }
+
+    .solid-glow {
+      position: absolute;
+      inset: 4% 0 0;
+      pointer-events: none;
+      background:
+        radial-gradient(40% 36% at 22% 55%, rgba(98, 231, 255, 0.26), transparent 70%),
+        radial-gradient(42% 38% at 78% 42%, rgba(131, 120, 255, 0.32), transparent 70%),
+        radial-gradient(22% 20% at 70% 82%, rgba(255, 159, 53, 0.14), transparent 70%);
+      filter: blur(22px);
+    }
+
+    #solidCard .solid-svg { position: relative; z-index: 1; width: 100%; overflow: visible; }
+
+    .solid-hint {
+      margin: 12px 20px 0;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--sx-sub);
+    }
+
+    .solid-hint::before { content: "☝ "; }
+
+    .solid-detail {
+      min-height: 1.5em;
+      margin: 6px 20px 0;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--sx-text);
+    }
+
+    /* ---------- ランキング ---------- */
+    .ranking-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ranking-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+
+    .ranking-row.is-me {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent) inset;
+    }
+
+    .rank-badge {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      background: var(--surface-2);
+      color: var(--text-sub);
+    }
+
+    .ranking-row[data-place="1"] {
+      background: linear-gradient(135deg, rgba(255, 215, 94, 0.18), transparent);
+      border-color: var(--gold);
+    }
+
+    .ranking-row[data-place="1"] .rank-badge {
+      background: linear-gradient(135deg, var(--gold), #ffb84d);
+      color: #4a3200;
+    }
+
+    .ranking-row[data-place="2"] {
+      background: linear-gradient(135deg, rgba(216, 216, 224, 0.16), transparent);
+      border-color: var(--silver);
+    }
+
+    .ranking-row[data-place="2"] .rank-badge {
+      background: linear-gradient(135deg, var(--silver), #b9b9c6);
+      color: #33333c;
+    }
+
+    .ranking-row[data-place="3"] {
+      background: linear-gradient(135deg, rgba(226, 162, 92, 0.16), transparent);
+      border-color: var(--bronze);
+    }
+
+    .ranking-row[data-place="3"] .rank-badge {
+      background: linear-gradient(135deg, var(--bronze), #c07a3e);
+      color: #3a2100;
+    }
+
+    .rank-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .rank-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rank-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .rank-score {
+      font-size: 11.5px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    .crown {
+      font-size: 13px;
+    }
+
+    .me-tag {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 1px 6px;
+    }
+
+    /* ---------- ログ＆グラフ: 推し活ヒートマップ ---------- */
+    /* マスコットのひまわりの種・激熱の火花を連想させる、暖色（オレンジ〜イエロー）の発光グラデーション */
+    .heatmap-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+      margin-bottom: 12px;
+    }
+
+    .heatmap-grid {
+      display: grid;
+      grid-template-rows: repeat(7, 1fr);
+      grid-auto-flow: column;
+      grid-auto-columns: 13px;
+      gap: 3px;
+      width: max-content;
+    }
+
+    .heatmap-cell {
+      width: 13px;
+      height: 13px;
+      padding: 0;
+      border: none;
+      border-radius: 3px;
+      background: var(--surface-2);
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .heatmap-cell.is-empty {
+      background: transparent;
+      cursor: default;
+    }
+
+    .heatmap-cell[data-level="1"] {
+      background: rgba(255, 122, 24, 0.32); /* 薄いオレンジ */
+    }
+
+    .heatmap-cell[data-level="2"] {
+      background: var(--accent); /* 鮮やかなオレンジ */
+    }
+
+    .heatmap-cell[data-level="3"] {
+      background: var(--accent-2); /* 光り輝くイエロー */
+      box-shadow: 0 0 6px rgba(255, 207, 51, 0.75);
+    }
+
+    .heatmap-cell:not(.is-empty):hover,
+    .heatmap-cell:not(.is-empty):focus-visible {
+      transform: scale(1.3);
+      outline: none;
+    }
+
+    .heatmap-cell.is-selected {
+      outline: 2px solid var(--text);
+      outline-offset: 1px;
+    }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10.5px;
+      color: var(--text-sub);
+      margin-bottom: 14px;
+    }
+
+    .heatmap-legend .heatmap-cell {
+      cursor: default;
+    }
+
+    .heatmap-detail {
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .heatmap-detail-date {
+      font-size: 12.5px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .heatmap-detail-row {
+      font-size: 12px;
+      color: var(--text-sub);
+      line-height: 1.6;
+    }
+
+    .mini-note {
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--text-sub);
+      margin: 0 0 16px;
+    }
+
+    /* ---------- 設定 ---------- */
+    .settings-block {
+      margin-bottom: 16px;
+      padding: 18px 16px;
+    }
+
+    .settings-block h3 {
+      margin: 0 0 12px;
+      font-size: 13.5px;
+      font-weight: 800;
+    }
+
+    .google-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .google-btn:active {
+      transform: scale(0.98);
+    }
+
+    .google-btn.needs-relogin {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 1px var(--danger) inset;
+    }
+
+    .google-mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: conic-gradient(#4285f4 0 25%, #34a853 25% 50%, #fbbc05 50% 75%, #ea4335 75% 100%);
+      flex-shrink: 0;
+    }
+
+    .login-status {
+      margin-top: 10px;
+      margin-bottom: 0;
+      font-size: 11.5px;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    .login-status.is-loading {
+      animation: loading-blink 1s ease-in-out infinite alternate;
+    }
+
+    .login-status.is-error {
+      color: var(--danger);
+      animation: none;
+    }
+
+    .auth-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .auth-user-email {
+      font-size: 13px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .auth-retry-btn {
+      display: block;
+      margin: 10px auto 0;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+    }
+
+    .field-input,
+    .field-select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 13.5px;
+    }
+
+    .field-input:focus,
+    .field-select:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .toggle-row .field-label {
+      margin-bottom: 2px;
+    }
+
+    .toggle-desc {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 46px;
+      height: 26px;
+      flex-shrink: 0;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-switch::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+
+    .toggle-switch:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .toggle-switch:checked::before {
+      transform: translateX(20px);
+    }
+
+    .plan-badge-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .plan-badge {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 999px;
+    }
+
+    .plan-badge[data-plan="free"] {
+      background: var(--surface-2);
+      color: var(--text-sub);
+    }
+
+    .plan-badge[data-plan="premium"] {
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent));
+      color: #fff;
+    }
+
+    .upgrade-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 11.5px;
+      font-weight: 800;
+      cursor: pointer;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+
+    /* ---------- ボトムナビゲーション ---------- */
+    .bottom-nav {
+      display: flex;
+      flex-shrink: 0;
+      background: var(--nav-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border);
+      padding:
+        8px 6px
+        max(8px, var(--safe-b));
+    }
+
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 2px;
+      border: none;
+      background: none;
+      color: var(--text-sub);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: color 0.15s ease, transform 0.15s ease;
+    }
+
+    .nav-btn:active {
+      transform: scale(0.94);
+    }
+
+    .nav-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .nav-btn.is-active {
+      color: var(--accent);
+    }
+
+    /* ============================================================
+     * 夜空・宇宙テーマ（ダッシュボード全体。どのテーマ設定でもこの見た目にする）
+     *   星空は静止した多重 radial-gradient ＋ ゆっくり瞬く 1 枚の層だけ（軽量）。
+     *   押した所は金×オレンジの発光（CSS の :active と、JS の波紋）
+     * ============================================================ */
+    #dashboard {
+      --bg: #070b1f;
+      --surface: rgba(24, 30, 72, 0.62);
+      --surface-2: rgba(70, 80, 150, 0.28);
+      --border: rgba(120, 140, 255, 0.26);
+      --text: #f4f6ff;
+      --sub-text: #aab4e6;
+      --text-sub: #aab4e6;
+      --nav-bg: rgba(14, 18, 48, 0.82);
+      --card-shadow: 0 10px 28px rgba(2, 4, 20, 0.55);
+      --radius-lg: 24px;
+      --gold-glow: linear-gradient(135deg, #ffe27a 0%, #ffb338 48%, #ff7a18 100%);
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 90% 40% at 12% 0%, rgba(80, 60, 200, 0.45), transparent 70%),
+        radial-gradient(ellipse 80% 35% at 100% 18%, rgba(40, 90, 220, 0.30), transparent 70%),
+        radial-gradient(ellipse 90% 40% at 50% 105%, rgba(150, 50, 160, 0.30), transparent 70%),
+        linear-gradient(180deg, #0a0f2e 0%, #070b1f 55%, #05071a 100%);
+    }
+
+    #dashboard::before,
+    #dashboard::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* 星（静止）。大きさ・明るさの違う点を散らす */
+    #dashboard::before {
+      background-image:
+        radial-gradient(1.5px 1.5px at 8% 12%, #fff, transparent),
+        radial-gradient(1px 1px at 22% 30%, #cfe0ff, transparent),
+        radial-gradient(1.5px 1.5px at 35% 8%, #fff, transparent),
+        radial-gradient(1px 1px at 48% 22%, #dbe6ff, transparent),
+        radial-gradient(2px 2px at 63% 14%, #fff, transparent),
+        radial-gradient(1px 1px at 78% 34%, #cfe0ff, transparent),
+        radial-gradient(1.5px 1.5px at 91% 9%, #fff, transparent),
+        radial-gradient(1px 1px at 14% 52%, #dbe6ff, transparent),
+        radial-gradient(1.5px 1.5px at 30% 68%, #fff, transparent),
+        radial-gradient(1px 1px at 55% 58%, #cfe0ff, transparent),
+        radial-gradient(2px 2px at 72% 72%, #fff, transparent),
+        radial-gradient(1px 1px at 88% 56%, #dbe6ff, transparent),
+        radial-gradient(1.5px 1.5px at 6% 88%, #fff, transparent),
+        radial-gradient(1px 1px at 42% 92%, #cfe0ff, transparent),
+        radial-gradient(1.5px 1.5px at 66% 90%, #fff, transparent),
+        radial-gradient(1px 1px at 95% 82%, #dbe6ff, transparent);
+      opacity: 0.85;
+    }
+
+    /* 金色にきらめく少数の星（ここだけ瞬く） */
+    #dashboard::after {
+      background-image:
+        radial-gradient(2.5px 2.5px at 18% 20%, #ffd75e, transparent),
+        radial-gradient(2.5px 2.5px at 82% 24%, #ffc247, transparent),
+        radial-gradient(2.5px 2.5px at 40% 46%, #ffd75e, transparent),
+        radial-gradient(2.5px 2.5px at 90% 64%, #ffb338, transparent),
+        radial-gradient(2.5px 2.5px at 12% 76%, #ffc247, transparent),
+        radial-gradient(2.5px 2.5px at 60% 84%, #ffd75e, transparent);
+      animation: cosmic-twinkle 5s ease-in-out infinite alternate;
+    }
+
+    @keyframes cosmic-twinkle {
+      from { opacity: 0.25; }
+      to { opacity: 0.95; }
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+    }
+
+    .view-title,
+    .card-section-head h3 {
+      text-shadow: 0 0 14px rgba(140, 160, 255, 0.35);
+    }
+
+    /* カード: すりガラス風 */
+    #dashboard .card {
+      background: linear-gradient(160deg, rgba(40, 50, 120, 0.50), rgba(16, 20, 60, 0.62));
+      border: 1px solid var(--border);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* マスコット */
+    .mascot-sprite {
+      filter: drop-shadow(0 0 16px rgba(255, 150, 40, 0.55));
+    }
+
+    .mascot-caption {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: center;
+      color: var(--text);
+      text-shadow: 0 0 12px rgba(120, 140, 255, 0.6);
+    }
+
+    /* 統計カード: 左に丸い枠のアイコン、右にラベルと数値 */
+    .stat-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-areas: "icon label" "icon value";
+      align-items: center;
+      column-gap: 14px;
+      row-gap: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-icon {
+      grid-area: icon;
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      font-size: 24px;
+      background: radial-gradient(circle at 35% 30%, rgba(120, 140, 255, 0.45), rgba(20, 26, 70, 0.9));
+      border: 1px solid rgba(150, 170, 255, 0.4);
+      box-shadow: 0 0 14px rgba(110, 130, 255, 0.35);
+    }
+
+    .stat-label { grid-area: label; align-self: end; }
+    .stat-value { grid-area: value; align-self: start; font-size: 26px; font-weight: 900; }
+    .stat-card:not(.span-2) { column-gap: 10px; padding: 14px 12px; }
+    .stat-card:not(.span-2) .stat-icon { width: 42px; height: 42px; font-size: 20px; }
+    .stat-card:not(.span-2) .stat-label { font-size: 11px; white-space: nowrap; }
+    .stat-card:not(.span-2) .stat-value { font-size: 24px; }
+    .stat-card.span-2 .stat-icon { width: 64px; height: 64px; font-size: 30px; }
+    .stat-card.span-2 .stat-value { font-size: 34px; }
+
+    .stat-card.span-2::after {
+      content: "";
+      position: absolute;
+      right: -30px;
+      bottom: -40px;
+      width: 190px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 50% 100%, rgba(120, 170, 255, 0.45), transparent 70%);
+      pointer-events: none;
+    }
+
+    /* 激熱のカード（3 つ目）は炎の色 */
+    #dashboard .stat-card:nth-child(3) {
+      background: linear-gradient(160deg, rgba(120, 40, 60, 0.45), rgba(40, 16, 40, 0.65));
+      border-color: rgba(255, 130, 80, 0.4);
+    }
+
+    .stat-card:nth-child(3) .stat-icon {
+      background: radial-gradient(circle at 35% 30%, rgba(255, 150, 60, 0.45), rgba(60, 16, 20, 0.9));
+      border-color: rgba(255, 150, 80, 0.5);
+      box-shadow: 0 0 14px rgba(255, 120, 40, 0.4);
+    }
+
+    /* ストリーク（ホームの最初の card-section）: 金〜オレンジの縁 */
+    #view-home .card-section:nth-of-type(1) {
+      border-color: rgba(255, 170, 60, 0.55);
+      box-shadow: var(--card-shadow), 0 0 22px rgba(255, 140, 30, 0.22), inset 0 1px 0 rgba(255, 220, 150, 0.1);
+    }
+
+    .streak-count {
+      font-size: 44px;
+      background: var(--gold-glow);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 10px rgba(255, 150, 40, 0.5));
+    }
+
+    .streak-dot { height: 9px; }
+
+    .streak-dot.is-filled {
+      background: var(--gold-glow);
+      box-shadow: 0 0 8px rgba(255, 160, 40, 0.55);
+    }
+
+    /* 獲得ポイント実績 */
+    .points-total-value { background: var(--gold-glow); -webkit-background-clip: text; background-clip: text; }
+
+    /* ボタン共通 */
+    #dashboard button {
+      position: relative;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+
+    .upgrade-btn,
+    .google-btn {
+      background: rgba(70, 80, 150, 0.3);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    /* 押した所は金とオレンジが混ざった発光 */
+    #dashboard button:not(:disabled):not(.is-claimed):active {
+      background: var(--gold-glow);
+      color: #3a1a00;
+      border-color: rgba(255, 210, 120, 0.9);
+      box-shadow: 0 0 22px rgba(255, 160, 40, 0.75), inset 0 0 6px rgba(255, 230, 150, 0.9);
+      transform: scale(0.96);
+    }
+
+    /* 押した場所から広がる金×オレンジの波紋（JS が .tap-ripple を足す） */
+    .tap-ripple {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      background: radial-gradient(circle, rgba(255, 240, 170, 0.95) 0%, rgba(255, 170, 50, 0.75) 40%, rgba(255, 110, 20, 0) 72%);
+      animation: tap-ripple 0.6s ease-out forwards;
+    }
+
+    @keyframes tap-ripple {
+      to { transform: scale(9); opacity: 0; }
+    }
+
+    /* ボトムナビ: 浮かぶ丸いバー。選んだタブは金×オレンジに光る */
+    .bottom-nav {
+      margin: 0 12px max(10px, var(--safe-b));
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      background: var(--nav-bg);
+      box-shadow: 0 8px 28px rgba(2, 4, 20, 0.6);
+    }
+
+    .nav-btn { border-radius: 22px; color: var(--sub-text); }
+
+    #dashboard .nav-btn.is-active {
+      color: #ffd98a;
+      background: linear-gradient(180deg, rgba(255, 170, 60, 0.22), rgba(255, 120, 30, 0.08));
+      box-shadow: inset 0 0 0 1px rgba(255, 180, 70, 0.55), 0 0 16px rgba(255, 140, 30, 0.35);
+    }
+
+    .nav-btn.is-active .nav-icon { filter: drop-shadow(0 0 8px rgba(255, 170, 50, 0.85)); }
+
+    /* 入力欄・ランキングも夜空に合わせる */
+    #dashboard .field-input,
+    #dashboard .field-select {
+      background: rgba(10, 14, 44, 0.7);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    #dashboard .ranking-row {
+      background: linear-gradient(160deg, rgba(40, 50, 120, 0.42), rgba(16, 20, 60, 0.55));
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #dashboard::after { animation: none; opacity: 0.6; }
+      .tap-ripple { display: none; }
+    }
+
+    /* ============================================================
+     * えもちゃテイスト（2026-10-09 依頼者「アプリ版の画面を全体的にえもちゃテイストに。ところどころラベンダー付箋も」）
+     *   ・アクセントは金×オレンジをやめ、えもちゃの色（ピンク → 青 → すみれ。拡張機能のツールバー・宝箱のパネルと同じ）にする
+     *   ・夜空は残し、星雲をピンク・すみれ寄りに。瞬く星もピンク・ラベンダー
+     *   ・説明・メモの所は「ラベンダー付箋」（推しタウンの遊び方と同じ紙・縁・左の紫の帯）。.emo-note、案内は .emo-note--help で「？」
+     *   ・この節だけで上書きしている（前の見た目に戻す時は、この節を消すだけ。グラフの色は script の中の EMO_* も戻す）
+     *   ・ランキングの金・銀・銅、激熱の炎の色は意味があるので残す
+     * ============================================================ */
+    #dashboard {
+      --emo-pink: #f0539b;
+      --emo-blue: #6a7cf5;
+      --emo-violet: #8b5cf6;
+      /* 暗い地の上に置く文字・線の色（明るめ。どれも地の上で 4.5:1 以上） */
+      --emo-pink-light: #ff8cc6;
+      --emo-blue-light: #9aa8ff;
+      --emo-violet-light: #c4a6ff;
+      /* 塗り（白い文字を載せる。ごく薄く暗い層を重ねて、白い小さな文字も読めるように） */
+      --emo-grad: linear-gradient(rgba(30, 10, 60, 0.16), rgba(30, 10, 60, 0.16)), linear-gradient(135deg, #f0539b 0%, #6a7cf5 55%, #8b5cf6 100%);
+      /* 大きな数字（文字そのものをグラデーションに） */
+      --emo-grad-text: linear-gradient(135deg, #ff8cc6 0%, #a9b4ff 55%, #c9a8ff 100%);
+      --accent: #ff8cc6;
+      --accent-2: #9aa8ff;
+      --accent-pink: #f0539b;
+      --gold-glow: var(--emo-grad-text);
+      --surface: rgba(48, 32, 104, 0.6);
+      --surface-2: rgba(150, 120, 255, 0.16);
+      --border: rgba(196, 170, 255, 0.26);
+      --text: #f7f4ff;
+      --sub-text: #c3b8ec;
+      --text-sub: #c3b8ec;
+      --nav-bg: rgba(26, 16, 60, 0.84);
+      --card-shadow: 0 10px 28px rgba(8, 2, 28, 0.55);
+      background:
+        radial-gradient(ellipse 90% 40% at 10% 0%, rgba(240, 83, 155, 0.30), transparent 70%),
+        radial-gradient(ellipse 80% 35% at 100% 16%, rgba(106, 124, 245, 0.32), transparent 70%),
+        radial-gradient(ellipse 90% 40% at 50% 105%, rgba(139, 92, 246, 0.38), transparent 70%),
+        linear-gradient(180deg, #170f3c 0%, #0e0a2a 55%, #08061c 100%);
+    }
+
+    /* 瞬く星はピンク・ラベンダー・水色 */
+    #dashboard::after {
+      background-image:
+        radial-gradient(2.5px 2.5px at 18% 20%, #ff9ccf, transparent),
+        radial-gradient(2.5px 2.5px at 82% 24%, #c4a6ff, transparent),
+        radial-gradient(2.5px 2.5px at 40% 46%, #a9b4ff, transparent),
+        radial-gradient(2.5px 2.5px at 90% 64%, #ff9ccf, transparent),
+        radial-gradient(2.5px 2.5px at 12% 76%, #c4a6ff, transparent),
+        radial-gradient(2.5px 2.5px at 60% 84%, #ffd6ec, transparent);
+    }
+
+    .view-title,
+    .card-section-head h3 {
+      text-shadow: 0 0 14px rgba(240, 83, 155, 0.35);
+    }
+
+    /* カード: すみれ色のすりガラス。上の縁にうっすらピンクの光 */
+    #dashboard .card {
+      background: linear-gradient(160deg, rgba(76, 52, 160, 0.48), rgba(26, 16, 66, 0.64));
+      border-color: var(--border);
+      box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255, 190, 230, 0.12);
+    }
+
+    .mascot-sprite {
+      filter: drop-shadow(0 0 16px rgba(240, 83, 155, 0.5));
+    }
+
+    .stat-icon {
+      background: radial-gradient(circle at 35% 30%, rgba(200, 160, 255, 0.5), rgba(40, 22, 90, 0.92));
+      border-color: rgba(210, 180, 255, 0.45);
+      box-shadow: 0 0 14px rgba(160, 120, 255, 0.4);
+    }
+
+    .stat-card.span-2::after {
+      background: radial-gradient(ellipse at 50% 100%, rgba(240, 83, 155, 0.38), transparent 70%);
+    }
+
+    /* 大きな数字（累計視聴時間など）もえもちゃの色に */
+    .stat-card .stat-value {
+      background: linear-gradient(135deg, #ffffff 0%, #ffd6ec 60%, #d9c8ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* 激熱のカードは炎のまま（意味のある色）。少しだけピンク寄りに */
+    #dashboard .stat-card:nth-child(3) {
+      background: linear-gradient(160deg, rgba(140, 36, 80, 0.48), rgba(44, 14, 44, 0.66));
+      border-color: rgba(255, 130, 150, 0.42);
+    }
+
+    .stat-card:nth-child(3) .stat-value {
+      background: linear-gradient(135deg, #ffffff 0%, #ffd2b8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    /* ストリーク: 金の縁 → ピンクの縁 */
+    #view-home .card-section:nth-of-type(1) {
+      border-color: rgba(255, 140, 198, 0.55);
+      box-shadow: var(--card-shadow), 0 0 22px rgba(240, 83, 155, 0.22), inset 0 1px 0 rgba(255, 200, 230, 0.12);
+    }
+
+    .streak-count,
+    .points-total-value {
+      filter: drop-shadow(0 0 10px rgba(240, 83, 155, 0.45));
+    }
+
+    .streak-dot.is-filled {
+      background: linear-gradient(90deg, #ff8cc6, #a9b4ff, #c9a8ff);
+      box-shadow: 0 0 8px rgba(240, 83, 155, 0.5);
+    }
+
+    /* 選んでいる切り替え: えもちゃの色の地に白い文字 */
+    #dashboard .seg-btn.is-active {
+      color: #fff;
+      background: var(--emo-grad);
+      box-shadow: 0 2px 10px rgba(240, 83, 155, 0.3);
+    }
+
+    .wk-bar {
+      background: linear-gradient(180deg, #ff8cc6, #8b5cf6);
+    }
+
+    .bd-fill,
+    .led-fill.is-earned {
+      background: linear-gradient(90deg, #8b5cf6, #6a7cf5 50%, #ff8cc6);
+    }
+
+    .wk-col.is-top .wk-bar { box-shadow: 0 0 10px rgba(240, 83, 155, 0.55); }
+
+    .timeline-item::before { background: linear-gradient(135deg, #ff8cc6, #8b5cf6); }
+
+    /* ヒートマップ: すみれ → ピンク → 光るピンク */
+    .heatmap-cell[data-level="1"] { background: rgba(139, 92, 246, 0.45); }
+    .heatmap-cell[data-level="2"] { background: #c06ce6; }
+    .heatmap-cell[data-level="3"] { background: #ff8cc6; box-shadow: 0 0 6px rgba(255, 140, 198, 0.8); }
+
+    .viz-svg .v-label-on { fill: #1d1238; }
+
+    /* 押した所: 金×オレンジの発光 → えもちゃの色の発光 */
+    #dashboard button:not(:disabled):not(.is-claimed):active {
+      background: var(--emo-grad);
+      color: #fff;
+      border-color: rgba(255, 200, 235, 0.9);
+      box-shadow: 0 0 22px rgba(240, 83, 155, 0.6), inset 0 0 6px rgba(255, 220, 245, 0.7);
+    }
+
+    .tap-ripple {
+      background: radial-gradient(circle, rgba(255, 230, 245, 0.95) 0%, rgba(240, 83, 155, 0.7) 40%, rgba(139, 92, 246, 0) 72%);
+    }
+
+    /* ボトムナビ: 選んだタブはえもちゃの色の丸 */
+    #dashboard .nav-btn.is-active {
+      color: #fff;
+      background: var(--emo-grad);
+      box-shadow: 0 0 16px rgba(240, 83, 155, 0.4), inset 0 0 0 1px rgba(255, 220, 245, 0.4);
+    }
+
+    .nav-btn.is-active .nav-icon { filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)); }
+
+    .upgrade-btn,
+    .google-btn {
+      background: rgba(150, 120, 255, 0.18);
+    }
+
+    /* アップグレードは主役のボタン（えもちゃの色） */
+    #upgradeBtn {
+      color: #fff;
+      border-color: transparent;
+      background: var(--emo-grad);
+      box-shadow: 0 4px 14px rgba(240, 83, 155, 0.3);
+    }
+
+    .toggle-switch:checked {
+      background: var(--emo-grad);
+      border-color: transparent;
+    }
+
+    .plan-badge[data-plan="premium"] { background: var(--emo-grad); }
+
+    #dashboard .field-input,
+    #dashboard .field-select {
+      background: rgba(20, 12, 50, 0.7);
+    }
+
+    #dashboard .field-input:focus,
+    #dashboard .field-select:focus {
+      outline-color: var(--emo-pink-light);
+    }
+
+    #dashboard .ranking-row {
+      background: linear-gradient(160deg, rgba(76, 52, 160, 0.42), rgba(26, 16, 66, 0.56));
+    }
+
+    /* ---------- ラベンダー付箋 ----------
+     *   推しタウンの .card.help と同じ（地 #efecfd → #e4dffa・紫の縁・左に幅 6px の紫の帯・紺の文字）。
+     *   文字 #2a2454・薄い文字 #4f4a7a は、どれも地の上で 4.5:1 以上 */
+    .emo-note {
+      position: relative;
+      margin: 0 0 14px;
+      padding: 10px 14px 10px 20px;
+      border: 1px solid rgba(124, 108, 220, 0.45);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #efecfd, #e4dffa);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      color: #2a2454;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.6;
+      text-align: left;
+      text-shadow: none;
+    }
+
+    .emo-note::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 6px;
+      border-radius: 14px 0 0 14px;
+      background: linear-gradient(180deg, #8b7cf0, #6a5bd6);
+    }
+
+    .emo-note:empty { display: none; }
+
+    /* 案内（使い方の説明）は、頭に紫の丸い「？」 */
+    .emo-note--help {
+      padding-left: 46px;
+    }
+
+    .emo-note--help::after {
+      content: "？";
+      position: absolute;
+      top: 10px;
+      left: 18px;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      color: #fff;
+      background: #6a5bd6;
+    }
+
+    /* カードの中に置く付箋は、カードの縁から少し内側に */
+    .card .emo-note { margin: 10px 0 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22); }
+
+    /* ヒートマップの詳細（押した日のメモ）: 上の線の代わりに付箋にする */
+    .heatmap-detail.emo-note { padding-top: 10px; border-top: 1px solid rgba(124, 108, 220, 0.45); }
+    .emo-note .heatmap-detail-date { color: #3b2f8a; }
+    .emo-note .heatmap-detail-row { color: #4f4a7a; }
+
+    /* マスコットの吹き出し（ラベンダーの紙に、上向きのしっぽ） */
+    .mascot-caption.emo-bubble {
+      position: relative;
+      margin-top: 6px;
+      padding: 8px 16px;
+      border: 1px solid rgba(124, 108, 220, 0.45);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #efecfd, #e4dffa);
+      color: #3b2f8a;
+      font-size: 13px;
+      text-shadow: none;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), 0 0 18px rgba(240, 83, 155, 0.18);
+    }
+
+    .mascot-caption.emo-bubble::before {
+      content: "";
+      position: absolute;
+      top: -7px;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      border-top: 1px solid rgba(124, 108, 220, 0.45);
+      border-left: 1px solid rgba(124, 108, 220, 0.45);
+      background: #efecfd;
+      transform: translateX(-50%) rotate(45deg);
+    }
+
+    /* ============================================================
+     * 明るいラベンダー（昼）（2026-10-09 依頼者「画面が暗い」→ 2 案を見比べて B に決定）
+     *   淡いラベンダーの地に白いカード、濃い文字。上の「えもちゃテイスト」（暗い夜の版）の上に重ねて上書きする
+     *   （夜に戻す時は、この節を消すだけ）。もう 1 案（A「明るい夜」: 明るいすみれの地に、透けないすみれのカード）は不採用
+     *   立体グラフ（#solidCard）は「夜の展示空間」として作られているので、暗いまま残している
+     *   文字・線の色の変数は、白い紙の上で読める濃さに置き換える（#2a2454・#5a5390 は白の上で 4.5:1 以上）
+     * ============================================================ */
+    #dashboard {
+      --text: #2a2454;
+      --sub-text: #5a5390;
+      --text-sub: #5a5390;
+      --border: rgba(124, 108, 220, 0.32);
+      --surface-2: rgba(106, 91, 214, 0.1);
+      --nav-bg: rgba(255, 255, 255, 0.9);
+      --card-shadow: 0 8px 22px rgba(90, 60, 170, 0.14);
+      background:
+        radial-gradient(ellipse 90% 40% at 10% 0%, rgba(240, 83, 155, 0.22), transparent 70%),
+        radial-gradient(ellipse 80% 35% at 100% 16%, rgba(106, 124, 245, 0.22), transparent 70%),
+        radial-gradient(ellipse 90% 40% at 50% 105%, rgba(139, 92, 246, 0.25), transparent 70%),
+        linear-gradient(180deg, #f6f1ff 0%, #efe8ff 55%, #e9e0ff 100%);
+    }
+
+    #dashboard::before { opacity: 0; }
+    #dashboard::after { opacity: 0.5; }
+
+    #dashboard .card {
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(124, 108, 220, 0.28);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: var(--card-shadow);
+    }
+
+    #dashboard :is(.view-title, .card-section-head h3, .mascot-caption) { text-shadow: none; }
+
+    #dashboard :is(.stat-card .stat-value, .streak-count, .points-total-value) {
+      background: linear-gradient(135deg, #d6338a 0%, #5b5bd6 60%, #7c4ddb 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: none;
+    }
+
+    #dashboard .stat-icon {
+      background: radial-gradient(circle at 35% 30%, #ffffff, #e4dcff);
+      border-color: rgba(124, 108, 220, 0.35);
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+    }
+
+    #dashboard .stat-card:nth-child(3) {
+      background: linear-gradient(160deg, #fff0f4, #ffe1ea);
+      border-color: rgba(230, 90, 130, 0.4);
+    }
+
+    #dashboard .stat-card:nth-child(3) .stat-value {
+      background: linear-gradient(135deg, #c2255c, #e8590c);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    #dashboard .stat-card:nth-child(3) .stat-icon { background: radial-gradient(circle at 35% 30%, #fff, #ffd6e0); }
+    #dashboard .stat-card.span-2::after { opacity: 0.35; }
+    #dashboard #view-home .card-section:nth-of-type(1) { box-shadow: var(--card-shadow), 0 0 18px rgba(240, 83, 155, 0.15); }
+    #dashboard .ranking-row { background: rgba(255, 255, 255, 0.9); }
+    #dashboard :is(.field-input, .field-select) { background: #fff; color: var(--text); }
+    #dashboard .bottom-nav { box-shadow: 0 8px 24px rgba(90, 60, 170, 0.18); }
+    #dashboard :is(.points-split-item, .points-channel-row, .badge-row) { background: rgba(106, 91, 214, 0.08); }
+    #dashboard .upgrade-btn:not(#upgradeBtn),
+    #dashboard .google-btn { background: #fff; color: var(--text); }
+    #dashboard .toggle-switch:not(:checked) { background: rgba(106, 91, 214, 0.18); }
+    #dashboard .badge-icon:not(.is-earned) { opacity: 0.3; }
+    #dashboard .heatmap-cell.is-empty { background: transparent; }
+    /* 白い紙の上ではラベンダー付箋が溶けるので、縁を少し濃く */
+    #dashboard .emo-note { border-color: rgba(106, 91, 214, 0.55); }
+  </style>
+</head>
+
+<body>
+
+  <main id="dashboard">
+    <div class="app-shell">
+
+      <!-- 🏠 ホーム -->
+      <section class="view" id="view-home" data-view="home">
+        <div class="mascot-spot">
+          <div class="mascot-sprite" role="img" aria-label="実績を見守るマスコット"></div>
+          <p class="mascot-caption emo-bubble">今日もがんばるあなたを見守っています！✦</p>
+        </div>
+
+        <p class="sync-status" id="homeSyncStatus" hidden></p>
+
+        <div class="stat-grid" id="statGrid"></div>
+
+        <p class="today-summary emo-note" id="todaySummary" hidden></p>
+
+        <div class="card card-section">
+          <div class="card-section-head">
+            <h3>🔥 継続日数（ストリーク）</h3>
+            <span class="tier-badge" id="tierBadge"></span>
+          </div>
+          <div class="streak-row">
+            <span class="streak-count" id="streakCount">0</span>
+            <span class="streak-unit">日連続</span>
+          </div>
+          <p class="streak-sub" id="streakSub"></p>
+          <div class="streak-track" id="streakTrack"></div>
+        </div>
+
+        <div class="card card-section">
+          <div class="card-section-head">
+            <h3>🎁 獲得ポイント実績</h3>
+          </div>
+          <div class="points-total">
+            <span class="points-total-value" id="pointsTotal">0</span>
+            <span class="points-total-unit">pt</span>
+          </div>
+          <p class="points-total-label">これまでに獲得した合計</p>
+          <div class="points-split">
+            <!-- 共通ポイント（ログインボーナス）は 2026-10-06 に廃止。枠は残して隠す（app.js の renderPoints が値を入れる） -->
+            <div class="points-split-item" hidden>
+              <span class="points-split-value" id="pointsCommon">0</span>
+              <span class="points-split-label">共通（ログイン）</span>
+            </div>
+            <div class="points-split-item">
+              <span class="points-split-value" id="pointsChannelSum">0</span>
+              <span class="points-split-label">チャンネル（視聴）</span>
+            </div>
+          </div>
+          <h4 class="points-channel-title">チャンネルごとの獲得ポイント</h4>
+          <ul class="points-channel-list" id="pointsChannelList"></ul>
+        </div>
+
+        <div class="card card-section">
+          <div class="card-section-head">
+            <h3>🏅 称号（バッジ）</h3>
+          </div>
+          <p class="points-total-label emo-note emo-note--help" id="badgeSummary" style="margin:0 0 12px;"></p>
+          <ul class="badge-list" id="badgeList"></ul>
+        </div>
+      </section>
+
+      <!-- 👑 ランキング -->
+      <section class="view" id="view-ranking" data-view="ranking" hidden>
+        <h2 class="view-title">👑 ランキング</h2>
+        <p class="view-subtitle" id="rankingSubtitle"></p>
+        <ul class="ranking-list" id="rankingList"></ul>
+        <h3 class="view-title" style="margin-top:24px">🖼️ 今月の寄せ書き</h3>
+        <p class="view-subtitle">推しの街ごとの、今月の進み具合です（見るだけ）。</p>
+        <ul class="ranking-list" id="boardList"></ul>
+      </section>
+
+      <!-- 📊 ログ＆グラフ -->
+      <section class="view" id="view-log" data-view="log" hidden>
+        <h2 class="view-title">📊 ログ＆グラフ</h2>
+
+        <div class="card card-section">
+          <div class="card-section-head">
+            <h3>🌻 直近90日の推し活ヒートマップ</h3>
+          </div>
+          <div class="heatmap-wrap">
+            <div class="heatmap-grid" id="heatmapGrid"></div>
+          </div>
+          <div class="heatmap-legend">
+            <span>少ない</span>
+            <span class="heatmap-cell" data-level="0"></span>
+            <span class="heatmap-cell" data-level="1"></span>
+            <span class="heatmap-cell" data-level="2"></span>
+            <span class="heatmap-cell" data-level="3"></span>
+            <span>多い</span>
+          </div>
+          <div class="heatmap-detail emo-note">
+            <div class="heatmap-detail-date" id="heatmapDetailDate">マスをタップすると詳細が見られます</div>
+            <div class="heatmap-detail-row" id="heatmapDetailWatch"></div>
+            <div class="heatmap-detail-row" id="heatmapDetailFever"></div>
+          </div>
+        </div>
+
+        <div class="card card-section" id="graphCard">
+          <div class="card-section-head">
+            <h3>📈 推し活グラフ</h3>
+          </div>
+          <div class="seg" id="graphMetric" role="tablist" aria-label="見る項目">
+            <button type="button" class="seg-btn is-active" data-value="points">ポイント</button>
+            <button type="button" class="seg-btn" data-value="watch">視聴時間</button>
+            <button type="button" class="seg-btn" data-value="comments">コメント</button>
+            <button type="button" class="seg-btn" data-value="fever">激熱</button>
+          </div>
+          <div class="seg seg-sm" id="graphPeriod" role="tablist" aria-label="期間">
+            <button type="button" class="seg-btn is-active" data-value="day">日</button>
+            <button type="button" class="seg-btn" data-value="month">月</button>
+            <button type="button" class="seg-btn" data-value="year">年</button>
+          </div>
+          <div class="seg seg-sm" id="graphKind" role="tablist" aria-label="ポイントの種類">
+            <button type="button" class="seg-btn is-active" data-value="all">すべて</button>
+            <button type="button" class="seg-btn" data-value="common">共通</button>
+            <button type="button" class="seg-btn" data-value="channel">チャンネル</button>
+          </div>
+          <div class="graph-summary" id="graphSummary"></div>
+          <svg class="graph-svg" id="graphSvg" viewBox="0 0 320 170" role="img" aria-label="推し活グラフ"></svg>
+          <div class="graph-legend" id="graphLegend"></div>
+          <p class="graph-detail" id="graphDetail">棒をタップすると内訳が見られます</p>
+          <h4 class="points-channel-title">曜日ごとの傾向（1日あたりの平均）</h4>
+          <div class="wk-chart" id="weekdayChart"></div>
+          <p class="mini-note emo-note emo-note--help" id="graphNote"></p>
+        </div>
+
+        <div class="card card-section" id="breakdownCard">
+          <div class="card-section-head">
+            <h3>🧭 チャンネル別の内訳</h3>
+          </div>
+          <div class="seg seg-sm seg-scroll" id="bdMetric" role="tablist" aria-label="見る項目">
+            <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
+            <button type="button" class="seg-btn" data-value="comments">コメント</button>
+            <button type="button" class="seg-btn" data-value="fever">激熱</button>
+            <button type="button" class="seg-btn" data-value="points">ポイント</button>
+            <button type="button" class="seg-btn" data-value="density">コメント密度</button>
+          </div>
+          <div class="bd-list" id="bdList"></div>
+          <h4 class="points-channel-title">ライブとアーカイブ（視聴時間の割合）</h4>
+          <div class="donut-row">
+            <svg class="donut-svg" id="liveDonut" viewBox="0 0 100 100" role="img" aria-label="ライブとアーカイブの視聴時間の割合"></svg>
+            <div class="donut-legend" id="liveDonutLegend"></div>
+          </div>
+        </div>
+
+      
+        <div class="card card-section" id="ledgerCard">
+          <div class="card-section-head">
+            <h3>⚖️ ポイントの収支</h3>
+          </div>
+          <div class="points-split">
+            <div class="points-split-item">
+              <span class="points-split-value" id="ledgerEarned">0 pt</span>
+              <span class="points-split-label">貯めた合計（共通＋チャンネル）</span>
+            </div>
+            <div class="points-split-item">
+              <span class="points-split-value" id="ledgerSpent">0 pt</span>
+              <span class="points-split-label">使った合計（応援）</span>
+            </div>
+          </div>
+          <h4 class="points-channel-title">チャンネルごと（貯めた量と使った量）</h4>
+          <div class="bd-list" id="ledgerList"></div>
+        </div>
+
+        <div class="card card-section" id="tenureCard">
+          <div class="card-section-head">
+            <h3>🌱 推し歴と年表</h3>
+          </div>
+          <div class="bd-list" id="tenureList"></div>
+          <h4 class="points-channel-title">推しを増やした年表</h4>
+          <ol class="timeline" id="timelineList"></ol>
+        </div>
+
+        <div class="card card-section" id="vizCard">
+          <div class="card-section-head">
+            <h3>🎨 いろいろなグラフ</h3>
+          </div>
+          <div class="seg seg-wrap" id="vizType" role="tablist" aria-label="グラフの種類">
+            <button type="button" class="seg-btn is-active" data-value="honey">🍯 ハニカム</button>
+            <button type="button" class="seg-btn" data-value="rose">🌸 花びら</button>
+            <button type="button" class="seg-btn" data-value="tree">🧱 ブロック</button>
+            <button type="button" class="seg-btn" data-value="bubble">🫧 バブル</button>
+            <button type="button" class="seg-btn" data-value="growth">🌱 成長</button>
+            <button type="button" class="seg-btn" data-value="radar">🕸️ レーダー</button>
+            <button type="button" class="seg-btn" data-value="rings">🎯 達成度</button>
+            <button type="button" class="seg-btn" data-value="year">🪵 年輪</button>
+            <button type="button" class="seg-btn" data-value="stream">🌊 ストリーム</button>
+            <button type="button" class="seg-btn" data-value="sankey">🔀 ポイントの流れ</button>
+            <button type="button" class="seg-btn" data-value="multi">📊 ミニ推移</button>
+            <button type="button" class="seg-btn" data-value="waffle">🧇 ワッフル</button>
+            <button type="button" class="seg-btn" data-value="ridge">🏔 山脈</button>
+            <button type="button" class="seg-btn" data-value="sunburst">☀️ サンバースト</button>
+            <button type="button" class="seg-btn" data-value="punch">🔵 ドット</button>
+            <button type="button" class="seg-btn" data-value="dumbbell">🏋️ ダンベル</button>
+            <button type="button" class="seg-btn" data-value="hist">🔔 ふだんの1日</button>
+          </div>
+          <div class="seg seg-sm" id="vizMetric" role="tablist" aria-label="見る項目">
+            <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
+            <button type="button" class="seg-btn" data-value="comments">コメント</button>
+            <button type="button" class="seg-btn" data-value="fever">激熱</button>
+            <button type="button" class="seg-btn" data-value="points">ポイント</button>
+          </div>
+          <svg class="graph-svg viz-svg" id="vizSvg" viewBox="0 0 320 250" role="img" aria-label="いろいろなグラフ"></svg>
+          <p class="graph-detail" id="vizDetail">タップすると詳しい値が見られます</p>
+          <p class="mini-note emo-note" id="vizNote"></p>
+        </div>
+      
+        <div class="card card-section solid-stage" id="solidCard">
+          <header class="solid-head">
+            <h3>🧊 立体グラフ</h3>
+            <p>直近の推し活を、立体で眺める</p>
+          </header>
+
+          <div class="solid-controls">
+            <div class="seg solid-seg solid-seg-grid" id="solidType" role="tablist" aria-label="グラフの種類">
+              <button type="button" class="seg-btn is-active" data-value="city">🏙️ 街</button>
+              <button type="button" class="seg-btn" data-value="hex">🍯 ハニカム</button>
+              <button type="button" class="seg-btn" data-value="ring">🎡 リング</button>
+              <button type="button" class="seg-btn" data-value="tower">🗼 タワー</button>
+              <button type="button" class="seg-btn" data-value="helix">🌀 らせん</button>
+              <button type="button" class="seg-btn" data-value="stack">📚 積み上げ</button>
+              <button type="button" class="seg-btn" data-value="group">🧩 グループ</button>
+            </div>
+            <div class="seg solid-seg solid-seg-sm solid-seg-grid" id="solidLook" role="tablist" aria-label="見た目">
+              <button type="button" class="seg-btn is-active" data-value="solid">ソリッド</button>
+              <button type="button" class="seg-btn" data-value="glass">ガラス</button>
+              <button type="button" class="seg-btn" data-value="neon">ネオン</button>
+              <button type="button" class="seg-btn" data-value="aurora">オーロラ</button>
+              <button type="button" class="seg-btn" data-value="gold">ゴールド</button>
+            </div>
+          </div>
+
+          <div class="solid-summary">
+            <div class="solid-sum-item">
+              <span class="solid-sum-label" id="solidSumLabel"></span>
+              <span class="solid-sum-value" id="solidSumValue"></span>
+            </div>
+            <span class="solid-sum-sep" aria-hidden="true"></span>
+            <div class="solid-sum-item">
+              <span class="solid-sum-label">先月の同じ日まで比</span>
+              <span class="solid-sum-value" id="solidSumDiff"></span>
+            </div>
+          </div>
+
+          <div class="solid-canvas">
+            <div class="solid-glow" aria-hidden="true"></div>
+            <svg class="graph-svg viz-svg solid-svg" id="solidSvg" viewBox="-8 -16 336 308" role="img" aria-label="立体グラフ"></svg>
+          </div>
+
+          <div class="solid-controls">
+            <div class="seg solid-seg solid-metrics" id="solidMetric" role="tablist" aria-label="見る項目">
+              <button type="button" class="seg-btn is-active" data-value="watch">⏱ 視聴時間</button>
+              <button type="button" class="seg-btn" data-value="comments">💬 コメント</button>
+              <button type="button" class="seg-btn" data-value="fever">🔥 激熱</button>
+              <button type="button" class="seg-btn" data-value="points">⭐ ポイント</button>
+            </div>
+          </div>
+          <p class="solid-hint" id="solidNote"></p>
+          <p class="solid-detail" id="solidDetail"></p>
+        </div>
+      </section>
+
+      <!-- ⚙️ 設定 -->
+      <section class="view" id="view-settings" data-view="settings" hidden>
+        <h2 class="view-title">⚙️ 設定</h2>
+
+        <div class="card settings-block">
+          <div id="authLoggedOut">
+            <button class="google-btn" id="googleLoginBtn" type="button">
+              <span class="google-mark"></span>
+              <span>Googleでログイン</span>
+            </button>
+          </div>
+          <div id="authLoggedIn" class="auth-user-row" hidden>
+            <span class="auth-user-email" id="authUserEmail"></span>
+            <button class="upgrade-btn" id="logoutBtn" type="button">ログアウト</button>
+          </div>
+          <p class="login-status" id="loginStatus">認証状態を確認中…</p>
+          <button class="upgrade-btn auth-retry-btn" id="authRetryBtn" type="button" hidden>もう一度試す</button>
+        </div>
+
+        <div class="card settings-block">
+          <h3>プロフィール</h3>
+          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;">このスマホ版は見るだけです。表示名やランキング参加の変更は、パソコンの拡張機能の設定ページから行えます。</p>
+          <div class="field">
+            <label class="field-label" for="displayNameInput">表示名</label>
+            <input class="field-input" id="displayNameInput" type="text" maxlength="20" readonly />
+          </div>
+          <!-- 有料版の案内（配信者ごとの表示名・現在のプラン）は、有料版を始めるまで出さない（2026-10-10 依頼者: 申請版に有料の入口を出さない）。
+               戻す時は、この p と下の「現在のプラン」の card の style="display:none" を外す -->
+          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;display:none;">プレミアム版では、配信者ごとに別の表示名にできます（拡張機能の「実績」タブで設定。24時間に1回まで変更可）。</p>
+          <div class="field toggle-row">
+            <div>
+              <span class="field-label" style="margin-bottom:2px;display:block;">ランキング参加</span>
+              <span class="toggle-desc">オフにすると他の人のランキングに表示されません</span>
+            </div>
+            <input class="toggle-switch" id="rankingOptInToggle" type="checkbox" role="switch" disabled />
+          </div>
+        </div>
+
+        <div class="card settings-block">
+          <h3>表示設定</h3>
+          <div class="field">
+            <label class="field-label" for="themeSelect">テーマ</label>
+            <select class="field-select" id="themeSelect">
+              <option value="auto">自動</option>
+              <option value="light">ライト</option>
+              <option value="dark">ダーク</option>
+              <option value="cream">クリーム</option>
+              <option value="gray">グレー</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card settings-block" style="display:none;">
+          <h3>現在のプラン</h3>
+          <div class="plan-badge-row">
+            <span class="plan-badge" id="planBadge"></span>
+            <button class="upgrade-btn" id="upgradeBtn" type="button">プレミアム版にアップグレード</button>
+          </div>
+        </div>
+
+        <div class="card settings-block">
+          <h3>このアプリについて</h3>
+          <p class="toggle-desc">えもちゃっとライブ スマホ版（見るだけ） <span id="webVersion"></span></p>
+          <p class="toggle-desc">日本国内の利用者に向けて提供しています。記録は 1 日 1 回、開いた時に取り込みます。</p>
+          <p class="toggle-desc">
+            <a href="https://shijou1019-netizen.github.io/emocha-site/terms.html" target="_blank" rel="noopener">利用規約</a> ／
+            <a href="https://shijou1019-netizen.github.io/emocha-site/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+          </p>
+        </div>
+      </section>
+
+      <nav class="bottom-nav" aria-label="メインナビゲーション">
+        <button class="nav-btn is-active" data-tab="home" type="button">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">ホーム</span>
+        </button>
+        <button class="nav-btn" data-tab="ranking" type="button">
+          <span class="nav-icon">👑</span>
+          <span class="nav-label">ランキング</span>
+        </button>
+        <button class="nav-btn" data-tab="log" type="button">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">ログ</span>
+        </button>
+        <button class="nav-btn" data-tab="settings" type="button">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">設定</span>
+        </button>
+      </nav>
+
+    </div>
+  </main>
+
+  <!-- 読み込み画面「Now Loading」（2026-10-09 にハムスターから変更） -->
+  <div id="loadingScreen" role="status" aria-live="polite">
+    <div class="loader-content">
+      <p class="now-loading" aria-label="Now Loading">
+        <span class="now-loading-word">Now Loading</span>
+        <span class="now-loading-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </p>
+      <div class="now-loading-bar" aria-hidden="true"></div>
+      <p class="loading-sub">推し活データ同期中</p>
+    </div>
+  </div>
+
+  <script src="./vendor/supabase.js"></script>
+  <script src="./app.js"></script>
+
+</body>
+</html>

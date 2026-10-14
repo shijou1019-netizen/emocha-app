@@ -1,0 +1,16 @@
+{
+  "name": "えもちゃっとライブ",
+  "short_name": "えもちゃっと",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f1ff",
+  "theme_color": "#f6f1ff",
+  "icons": [
+    {
+      "src": "./WEBアプリアイコン.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
