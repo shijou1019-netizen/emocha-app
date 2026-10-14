@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="dark">
+<html lang="ja" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -791,21 +791,46 @@
       stroke-linejoin: round;
     }
 
-    .badge-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    /* チャンネルの一覧の行（押せる）と、チャンネルのページ */
+    .points-channel-row.is-link { cursor: pointer; }
+    .points-channel-row.is-link::after { content: "›"; font-size: 18px; font-weight: 800; color: var(--text-sub); margin-left: 2px; }
+    .points-channel-row.is-link:active { filter: brightness(0.96); }
 
-    .badge-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      background: var(--surface-2);
+    .back-btn {
+      margin: 0 0 12px;
+      padding: 6px 12px;
+      border: 1px solid rgba(124, 108, 220, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.7);
+      color: #3b2f8a;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
     }
 
-    .badge-name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .badge-icons { display: flex; gap: 10px; }
-    .badge-icon { font-size: 20px; filter: grayscale(1); opacity: 0.22; }
-    .badge-icon.is-earned { filter: none; opacity: 1; }
+    .channel-head { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .channel-avatar {
+      flex: none; width: 52px; height: 52px; border-radius: 50%; object-fit: cover;
+      display: grid; place-items: center; font-size: 20px; font-weight: 800; color: #fff; overflow: hidden;
+    }
+    .channel-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .channel-head-text { min-width: 0; }
+    .channel-name { margin: 0; font-size: 18px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .channel-since { margin: 2px 0 0; font-size: 12px; color: var(--text-sub); font-weight: 600; }
+    .channel-stats { margin-bottom: 14px; }
+
+    /* インデックス（横長の絵 800×160 を幅いっぱい・5:1 で）。未取得は薄く。段の名前は出さない（番号だけ） */
+    .idx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .idx-row { display: flex; flex-direction: column; gap: 5px; }
+    .idx-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .idx-kind { font-size: 12.5px; font-weight: 800; }
+    .idx-rank { font-size: 12px; font-weight: 700; color: var(--text-sub); }
+    .idx-img {
+      display: block; width: 100%; aspect-ratio: 5 / 1; object-fit: cover; border-radius: 3px;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2); user-select: none;
+    }
+    .idx-img.is-locked { opacity: 0.22; filter: saturate(0.1) brightness(0.8); }
+    .idx-next { font-size: 11.5px; color: var(--text-sub); font-weight: 600; margin: 2px 0 0; }
 
     .led-row { display: flex; flex-direction: column; gap: 4px; }
     .led-name { margin-bottom: 1px; }
@@ -2073,12 +2098,34 @@
           <ul class="points-channel-list" id="pointsChannelList"></ul>
         </div>
 
+        <!-- チャンネルごとの記録（押すとそのチャンネルのページへ。2026-10-14 依頼者: 称号の枠をやめ、チャンネルごとのページに） -->
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>🏅 称号（バッジ）</h3>
+            <h3>📺 チャンネルごとの記録</h3>
           </div>
-          <p class="points-total-label emo-note emo-note--help" id="badgeSummary" style="margin:0 0 12px;"></p>
-          <ul class="badge-list" id="badgeList"></ul>
+          <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">押すと、そのチャンネルの記録とインデックスが見られます。</p>
+          <ul class="points-channel-list" id="channelList"></ul>
+        </div>
+      </section>
+
+      <!-- 📺 チャンネルのページ（ホームの一覧から開く。下のタブには無い） -->
+      <section class="view" id="view-channel" data-view="channel" hidden>
+        <button class="back-btn" id="channelBack" type="button">‹ ホームへ戻る</button>
+        <div class="channel-head">
+          <span class="channel-avatar" id="channelAvatar"></span>
+          <div class="channel-head-text">
+            <h2 class="channel-name" id="channelName"></h2>
+            <p class="channel-since" id="channelSince"></p>
+          </div>
+        </div>
+        <div class="stat-grid channel-stats" id="channelStats"></div>
+
+        <div class="card card-section">
+          <div class="card-section-head">
+            <h3>🎖️ インデックス</h3>
+          </div>
+          <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">このチャンネルでの記録で決まる 5 種類の印です。段が上がると絵が替わります。</p>
+          <ul class="idx-list" id="indexList"></ul>
         </div>
       </section>
 
@@ -2318,20 +2365,6 @@
               <span class="toggle-desc">オフにすると他の人のランキングに表示されません</span>
             </div>
             <input class="toggle-switch" id="rankingOptInToggle" type="checkbox" role="switch" disabled />
-          </div>
-        </div>
-
-        <div class="card settings-block">
-          <h3>表示設定</h3>
-          <div class="field">
-            <label class="field-label" for="themeSelect">テーマ</label>
-            <select class="field-select" id="themeSelect">
-              <option value="auto">自動</option>
-              <option value="light">ライト</option>
-              <option value="dark">ダーク</option>
-              <option value="cream">クリーム</option>
-              <option value="gray">グレー</option>
-            </select>
           </div>
         </div>
 

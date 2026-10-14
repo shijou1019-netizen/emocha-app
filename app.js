@@ -248,9 +248,12 @@ const { createClient } = window.supabase;
     views.forEach((view) => {
       view.hidden = view.dataset.view !== tab;
     });
+    // チャンネルのページはホームの続きなので、下のタブは「ホーム」を光らせたまま
+    const navTab = tab === "channel" ? "home" : tab;
     navButtons.forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.tab === tab);
+      btn.classList.toggle("is-active", btn.dataset.tab === navTab);
     });
+    document.querySelector(`.view[data-view="${tab}"]`)?.scrollTo?.(0, 0);
   }
 
   navButtons.forEach((btn) => {
@@ -262,23 +265,25 @@ const { createClient } = window.supabase;
   //   自前の固定の文字列なので innerHTML に入れてよい。グラデーションの id は 3 つで別にする（同じ画面に並ぶため）
   // ============================================================
   const STAT_ICON_DEFS = (id, stops) => `<defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0">${stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join("")}</linearGradient></defs>`;
-  const STAT_ICONS = {
+  const statIcons = (sfx = "") => ({
     // 炎: 外側の大きな炎（青→紫→ピンク）・内側の炎（ピンク→オレンジ）・光る芯（黄→白）
-    fever: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gFev1", [[0, "#3b4de8"], [0.5, "#9a4cf0"], [1, "#ff5fb5"]])}${STAT_ICON_DEFS("gFev2", [[0, "#ff5fb5"], [1, "#ffb347"]])}
-      <path fill="url(#gFev1)" d="M33 3c5 11 17 16 20 30 2 13-6 25-21 28C17 59 8 47 10 33c1-8 7-12 9-22 4 4 6 9 6 13 2-9 5-15 8-21zM13 30c-4 6-3 14 1 19-2-7 0-13-1-19zM53 28c-1 7 1 12-2 19 5-5 6-13 2-19z"/>
-      <path fill="url(#gFev2)" d="M32 22c4 7 12 11 12 22 0 8-6 14-12 14s-12-6-12-14c0-6 4-9 5-15 3 3 4 6 4 9 1-6 2-11 3-16z"/>
+    fever: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS(`gFev1${sfx}`, [[0, "#3b4de8"], [0.5, "#9a4cf0"], [1, "#ff5fb5"]])}${STAT_ICON_DEFS(`gFev2${sfx}`, [[0, "#ff5fb5"], [1, "#ffb347"]])}
+      <path fill="url(#gFev1${sfx})" d="M33 3c5 11 17 16 20 30 2 13-6 25-21 28C17 59 8 47 10 33c1-8 7-12 9-22 4 4 6 9 6 13 2-9 5-15 8-21zM13 30c-4 6-3 14 1 19-2-7 0-13-1-19zM53 28c-1 7 1 12-2 19 5-5 6-13 2-19z"/>
+      <path fill="url(#gFev2${sfx})" d="M32 22c4 7 12 11 12 22 0 8-6 14-12 14s-12-6-12-14c0-6 4-9 5-15 3 3 4 6 4 9 1-6 2-11 3-16z"/>
       <circle cx="32" cy="47" r="6.5" fill="#fff0a8"/><circle cx="32" cy="47" r="3.5" fill="#ffffff"/></svg>`,
     // コメント: 吹き出し（青→紫）＋ 右上にキラッとした星
-    comments: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gCom1", [[0, "#3b4de8"], [0.6, "#8a5cf0"], [1, "#ff7bd0"]])}
-      <path fill="url(#gCom1)" d="M14 12h30a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10H30l-11 10v-10h-5A10 10 0 0 1 4 34V22a10 10 0 0 1 10-10z"/>
+    comments: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS(`gCom1${sfx}`, [[0, "#3b4de8"], [0.6, "#8a5cf0"], [1, "#ff7bd0"]])}
+      <path fill="url(#gCom1${sfx})" d="M14 12h30a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10H30l-11 10v-10h-5A10 10 0 0 1 4 34V22a10 10 0 0 1 10-10z"/>
       <circle cx="19" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/><circle cx="29" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/><circle cx="39" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/>
       <path fill="#ffe36b" d="M52 4l2.2 5.8L60 12l-5.8 2.2L52 20l-2.2-5.8L44 12l5.8-2.2z"/></svg>`,
     // 視聴時間: 時計の輪（青→紫→ピンク）に、流れ星のような針と右上の星
-    watch: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gWat1", [[0, "#3b4de8"], [0.55, "#9a4cf0"], [1, "#ff5fb5"]])}
-      <circle cx="30" cy="34" r="22" fill="none" stroke="url(#gWat1)" stroke-width="7" stroke-linecap="round" stroke-dasharray="118 20" transform="rotate(-60 30 34)"/>
-      <path fill="url(#gWat1)" d="M30 18a3 3 0 0 1 3 3v12l8 5a3 3 0 0 1-3 5l-10-6a3 3 0 0 1-1-2V21a3 3 0 0 1 3-3z"/>
+    watch: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS(`gWat1${sfx}`, [[0, "#3b4de8"], [0.55, "#9a4cf0"], [1, "#ff5fb5"]])}
+      <circle cx="30" cy="34" r="22" fill="none" stroke="url(#gWat1${sfx})" stroke-width="7" stroke-linecap="round" stroke-dasharray="118 20" transform="rotate(-60 30 34)"/>
+      <path fill="url(#gWat1${sfx})" d="M30 18a3 3 0 0 1 3 3v12l8 5a3 3 0 0 1-3 5l-10-6a3 3 0 0 1-1-2V21a3 3 0 0 1 3-3z"/>
       <path fill="#ffe36b" d="M51 6l2.4 6.6L60 15l-6.6 2.4L51 24l-2.4-6.6L42 15l6.6-2.4z"/></svg>`,
-  };
+  });
+  const STAT_ICONS = statIcons("");
+  const STAT_ICONS_CH = statIcons("Ch"); // チャンネルのページ用（id を変える）
 
   // ============================================================
   // 🏠 ホーム描画
@@ -331,6 +336,7 @@ const { createClient } = window.supabase;
     ).join("");
 
     renderPoints();
+    renderChannelList();
   }
 
   // 獲得ポイント実績（これまでに獲得した合計・内訳・チャンネルごと）。残高や受け取りは扱わない
@@ -375,6 +381,8 @@ const { createClient } = window.supabase;
       pt.className = "points-channel-pt";
       pt.textContent = `${formatCount(ch.points)} pt`;
 
+      row.classList.add("is-link");
+      row.addEventListener("click", () => openChannel(ch, i));
       row.append(avatar, name, pt);
       list.append(row);
     });
@@ -2037,68 +2045,162 @@ const { createClient } = window.supabase;
   }
 
   // ============================================================
-  // 🔎 そのほかの実績（称号・ポイントの収支・推し歴と年表・ストリーク）
+  // 🔎 そのほかの実績（ポイントの収支・推し歴と年表・ストリーク）
   //   どれも拡張機能がすでに数えて同期している値（user_channel_stats・user_daily_activity）から、
   //   ここで計算するだけ。新しい測定は要らない
   // ============================================================
-  // 称号の条件は拡張機能（src/content/features/achievements.js の BADGES）と同じ。チャンネルごとに判定する
-  const BADGES = [
-    { id: "watch1h", icon: "🕐", label: "常連さん", hint: "視聴1時間", test: (c) => c.watchMs >= 60 * 60_000 },
-    { id: "watch10h", icon: "🏅", label: "皆勤賞", hint: "視聴10時間", test: (c) => c.watchMs >= 10 * 60 * 60_000 },
-    { id: "watch50h", icon: "👑", label: "レジェンド", hint: "視聴50時間", test: (c) => c.watchMs >= 50 * 60 * 60_000 },
-    { id: "fever10", icon: "🔥", label: "激熱ハンター", hint: "激熱10回", test: (c) => c.fever >= 10 },
-    { id: "fever50", icon: "💥", label: "フィーバー王", hint: "激熱50回", test: (c) => c.fever >= 50 },
-    { id: "comments100", icon: "💬", label: "コメント職人", hint: "コメント100件", test: (c) => c.comments >= 100 },
-    { id: "veteran30d", icon: "📅", label: "古参", hint: "初視聴から30日", test: (c) => c.firstWatchAt > 0 && Date.now() - c.firstWatchAt >= 30 * 86_400_000 },
+  // ============================================================
+  // 📺 チャンネルごとのページ（ホームの一覧から開く。2026-10-14 依頼者）とインデックス
+  //   段の決め方は拡張機能の src/core/index-badges.js と同じ（しきい値・周回）。**段の名前（モチーフ）は持ち込まない**（2026-10-10 依頼者決定:
+  //   モチーフは公開しない。この app.js は公開リポジトリに置くため、番号だけ）。絵は images/index/<id>.webp（拡張機能と同じファイル）
+  // ============================================================
+  const HOUR = 60 * 60_000;
+  const DAY = 24 * HOUR;
+  const INDEX_SERIES = [
+    { kind: "watch", label: "視聴時間", unit: "hours", value: (e) => e.watchMs ?? 0, laps: { count: 3, span: 1100 * HOUR, mark: "e" },
+      ranks: [10, 40, 70, 100, 150, 200, 300, 400, 550, 700, 900, 1100].map((h) => h * HOUR) },
+    { kind: "comment", label: "コメント", unit: "count", value: (e) => e.commentSendCount ?? 0, ranks: [10, 25, 50, 100, 250, 500, 1000, 1500, 2000, 3000] },
+    { kind: "fever", label: "激熱", unit: "count", value: (e) => e.feverCount ?? 0, ranks: [5, 10, 20, 35, 60, 100, 150, 250, 400, 600] },
+    { kind: "veteran", label: "古参", unit: "days", value: (e, now) => (e.firstWatchAt ? now - e.firstWatchAt : 0), laps: { count: 4, span: 365 * DAY, mark: "" },
+      ranks: [7, 30, 60, 90, 180, 270, 365].map((d) => d * DAY) },
+    { kind: "cheer", label: "大応援", unit: "count", value: (e) => e.cheerCount ?? 0, ranks: [1, 10, 30, 100, 300] },
   ];
-
-  // ストリーク（連続で活動した日数）。日別の記録のうち、視聴かコメントがあった日を「活動した日」として数える
-  //   現在の連続は、今日か昨日まで続いている分だけ（それより前に途切れていたら 0）
-  function computeStreak(rows) {
-    const days = [...new Set(rows.filter((r) => r.watchMs > 0 || r.commentCount > 0).map((r) => r.date))].sort();
-    const dayNo = (d) => Math.round(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86_400_000);
-    let longest = 0, run = 0, prev = null;
-    for (const d of days) {
-      run = prev && dayNo(d) - dayNo(prev) === 1 ? run + 1 : 1;
-      longest = Math.max(longest, run);
-      prev = d;
+  const INDEX_BADGES = INDEX_SERIES.flatMap((s) => Array.from({ length: s.laps?.count ?? 1 }, (_, l) => l + 1)
+    .flatMap((lap) => s.ranks.map((base, i) => {
+      const at = base + (lap - 1) * (s.laps?.span ?? 0);
+      return { id: `${s.kind}_r${String(i + 1).padStart(2, "0")}${lap > 1 ? `_lap${lap}${s.laps.mark}` : ""}`, kind: s.kind, tier: i + 1, lap, at,
+        test: (e, now) => !!e && s.value(e, now) >= at };
+    })));
+  // 視聴実績 e から、種類ごとの「一番上の段」と「次の段まで」を出す
+  function indexStatus(e, now = Date.now()) {
+    return INDEX_SERIES.map((s) => {
+      const list = INDEX_BADGES.filter((b) => b.kind === s.kind);
+      let top = null;
+      let next = null;
+      for (const b of list) {
+        if (b.test(e, now)) top = b;
+        else if (!next) next = b;
+      }
+      return { series: s, top, next, remaining: next ? next.at - s.value(e, now) : 0, first: list[0] };
+    });
+  }
+  // 並び順（profiles.index_order。種類の id の配列）。入っていない種類は元の順で後ろに
+  function applyIndexOrder(items, order) {
+    const known = new Map(items.map((it) => [it.series.kind, it]));
+    const out = [];
+    for (const k of order ?? []) if (known.has(k) && !out.includes(known.get(k))) out.push(known.get(k));
+    for (const it of items) if (!out.includes(it)) out.push(it);
+    return out;
+  }
+  function formatRemaining(unit, remaining) {
+    if (unit === "hours") {
+      const minutes = Math.ceil(remaining / 60_000);
+      return minutes >= 60 ? `あと ${Math.floor(minutes / 60)} 時間 ${minutes % 60} 分` : `あと ${minutes} 分`;
     }
-    const today = localDateString(Date.now());
-    const yesterday = localDateString(Date.now() - 86_400_000);
-    const current = prev === today || prev === yesterday ? run : 0;
-    const tier = current >= 30 ? "gold" : current >= 7 ? "silver" : current >= 3 ? "bronze" : "none";
-    return { current, longest, tier };
+    if (unit === "days") return `あと ${Math.ceil(remaining / DAY)} 日`;
+    return `あと ${formatCount(remaining)} 回`;
   }
 
-  function renderBadges() {
-    const channels = [...DUMMY.channels].sort((a, b) => b.watchMs - a.watchMs);
-    let earned = 0;
-    const list = document.getElementById("badgeList");
+  function channelAvatarEl(ch, i, className) {
+    const wrap = document.createElement("span");
+    wrap.className = className;
+    if (ch.avatarUrl) {
+      const img = document.createElement("img");
+      img.src = ch.avatarUrl;
+      img.alt = "";
+      img.referrerPolicy = "no-referrer";
+      wrap.append(img);
+    } else {
+      wrap.textContent = initialOf(ch.name);
+      wrap.style.background = colorFor(i);
+    }
+    return wrap;
+  }
+
+  // ホームの「チャンネルごとの記録」の一覧（視聴時間の多い順）
+  function renderChannelList() {
+    const list = document.getElementById("channelList");
     list.replaceChildren();
-    for (const c of channels) {
+    const channels = [...DUMMY.channels].sort((a, b) => b.watchMs - a.watchMs);
+    if (!channels.length) {
+      const empty = document.createElement("li");
+      empty.className = "points-empty";
+      empty.textContent = "まだデータがありません。";
+      list.append(empty);
+      return;
+    }
+    channels.forEach((ch, i) => {
       const row = document.createElement("li");
-      row.className = "badge-row";
+      row.className = "points-channel-row is-link";
       const name = document.createElement("span");
-      name.className = "badge-name";
-      name.textContent = c.name; // 配信者名は外部由来の文字列なので textContent で入れる
-      const icons = document.createElement("span");
-      icons.className = "badge-icons";
-      for (const b of BADGES) {
-        const ok = b.test(c);
-        if (ok) earned++;
-        const icon = document.createElement("span");
-        icon.className = `badge-icon${ok ? " is-earned" : ""}`;
-        icon.textContent = b.icon;
-        icon.title = `${b.label}（${b.hint}）${ok ? "" : " 未獲得"}`;
-        icons.append(icon);
+      name.className = "points-channel-name";
+      name.textContent = ch.name; // 配信者名は外部由来の文字列なので textContent で入れる
+      const val = document.createElement("span");
+      val.className = "points-channel-pt";
+      val.textContent = formatWatchDuration(ch.watchMs);
+      row.append(channelAvatarEl(ch, i, "points-channel-avatar"), name, val);
+      row.addEventListener("click", () => openChannel(ch, i));
+      list.append(row);
+    });
+  }
+
+  function openChannel(ch, i = 0) {
+    const avatar = document.getElementById("channelAvatar");
+    avatar.replaceWith(Object.assign(channelAvatarEl(ch, i, "channel-avatar"), { id: "channelAvatar" }));
+    document.getElementById("channelName").textContent = ch.name;
+    const since = ch.firstWatchAt ? new Date(ch.firstWatchAt) : null;
+    document.getElementById("channelSince").textContent = since
+      ? `${since.getFullYear()}年${since.getMonth() + 1}月${since.getDate()}日 から見ている`
+      : "";
+
+    const stats = [
+      { icon: STAT_ICONS_CH.watch, value: formatWatchDuration(ch.watchMs), label: `視聴時間（ライブ ${formatWatchDuration(ch.liveWatchMs)}）` },
+      { icon: STAT_ICONS_CH.comments, value: formatCount(ch.comments), label: "コメント送信数" },
+      { icon: STAT_ICONS_CH.fever, value: `${formatCount(ch.fever)} 回`, label: "激熱の経験回数" },
+    ];
+    document.getElementById("channelStats").innerHTML = stats.map((s, k) => `
+      <div class="card stat-card${k === 0 ? " span-2" : ""}">
+        <span class="stat-icon">${s.icon}</span>
+        <span class="stat-value">${esc(s.value)}</span>
+        <span class="stat-label">${esc(s.label)}</span>
+      </div>`).join("");
+
+    const e = { watchMs: ch.watchMs, commentSendCount: ch.comments, feverCount: ch.fever, firstWatchAt: ch.firstWatchAt, cheerCount: ch.cheer ?? 0 };
+    const items = applyIndexOrder(indexStatus(e), DUMMY.profile.indexOrder);
+    const list = document.getElementById("indexList");
+    list.replaceChildren();
+    for (const it of items) {
+      const row = document.createElement("li");
+      row.className = "idx-row";
+      const head = document.createElement("div");
+      head.className = "idx-head";
+      const kind = document.createElement("span");
+      kind.className = "idx-kind";
+      kind.textContent = it.series.label;
+      const rank = document.createElement("span");
+      rank.className = "idx-rank";
+      rank.textContent = it.top
+        ? `${it.top.tier} 段目${it.top.lap > 1 ? `（${it.top.lap} 周目）` : ""}／全 ${it.series.ranks.length} 段`
+        : "まだ";
+      head.append(kind, rank);
+      const img = document.createElement("img");
+      img.className = `idx-img${it.top ? "" : " is-locked"}`;
+      img.src = `./images/index/${(it.top ?? it.first).id}.webp`;
+      img.alt = "";
+      img.decoding = "async";
+      img.draggable = false;
+      row.append(head, img);
+      if (it.next) {
+        const next = document.createElement("p");
+        next.className = "idx-next";
+        next.textContent = `次の段まで ${formatRemaining(it.series.unit, it.remaining)}`;
+        row.append(next);
       }
-      row.append(name, icons);
       list.append(row);
     }
-    document.getElementById("badgeSummary").textContent = channels.length
-      ? `獲得した称号 ${earned} 個（全 ${channels.length * BADGES.length} 個中）。アイコンを長押しすると条件が見られます。`
-      : "まだデータがありません。";
+    activateTab("channel");
   }
+  document.getElementById("channelBack").addEventListener("click", () => activateTab("home"));
 
   // ポイントの収支: 貯めた量と使った量を、全体とチャンネルごとに並べて比べる
   function renderLedger() {
@@ -2194,7 +2296,6 @@ const { createClient } = window.supabase;
   }
 
   function renderInsights() {
-    renderBadges();
     renderLedger();
     renderTenure();
   }
@@ -2368,35 +2469,8 @@ const { createClient } = window.supabase;
       renderPlan();
     });
 
-    // テーマ切り替え
-    const themeSelect = document.getElementById("themeSelect");
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    const THEME_COLOR = { light: "#f2f2f5", dark: "#1a1a1a", cream: "#f6efdc", gray: "#2c2c2c" };
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-
-    function resolveTheme(pref) {
-      if (pref === "auto") return media.matches ? "dark" : "light";
-      return pref;
-    }
-
-    function applyTheme(pref) {
-      const resolved = resolveTheme(pref);
-      document.documentElement.dataset.theme = resolved;
-      if (metaThemeColor) metaThemeColor.setAttribute("content", THEME_COLOR[resolved]);
-    }
-
-    let currentPref = "auto";
-    themeSelect.value = currentPref;
-    applyTheme(currentPref);
-
-    themeSelect.addEventListener("change", (e) => {
-      currentPref = e.target.value;
-      applyTheme(currentPref);
-    });
-
-    media.addEventListener("change", () => {
-      if (currentPref === "auto") applyTheme("auto");
-    });
+    // 見た目は「明るいラベンダー」の 1 つだけ（2026-10-14 依頼者決定: テーマの選択は無し。端末のダークモードにも追従しない）
+    document.documentElement.dataset.theme = "light";
   }
 
   // ============================================================
@@ -2497,7 +2571,7 @@ const { createClient } = window.supabase;
         const results = await Promise.all([
           // channels(...) は channel_id の外部キーで引く配信者名・アイコン。premium_* はチャンネルポイントの元（プレミアム中の視聴分）
           supabase.from("user_channel_stats")
-            .select("channel_id, watch_ms, comment_send_count, fever_count, live_watch_ms, first_watch_at, points_spent, premium_watch_ms, premium_live_watch_ms, channels(name, avatar_url)")
+            .select("channel_id, watch_ms, comment_send_count, fever_count, live_watch_ms, first_watch_at, points_spent, premium_watch_ms, premium_live_watch_ms, cheer_count, channels(name, avatar_url)")
             .eq("user_id", user.id),
           supabase.from("user_daily_activity").select("watch_ms, comment_count, fever_count")
             .eq("user_id", user.id).eq("date", today).maybeSingle(),
@@ -2510,7 +2584,7 @@ const { createClient } = window.supabase;
             .select("date, watch_ms, comment_count, fever_count, channel_points")
             .eq("user_id", user.id).order("date", { ascending: false }).range(0, 999),
           // 自分のプロフィール（表示名・ランキング参加。設定タブに「見るだけ」で出す。変更は拡張機能から）
-          supabase.from("profiles").select("display_name, ranking_opt_in").eq("user_id", user.id).maybeSingle(),
+          supabase.from("profiles").select("display_name, ranking_opt_in, index_order").eq("user_id", user.id).maybeSingle(),
         ]);
         for (const r of results) if (r.error) throw r.error;
         return results.map((r) => r.data ?? null);
@@ -2530,13 +2604,14 @@ const { createClient } = window.supabase;
       //   ライブ視聴は毎分 2pt・アーカイブ視聴は毎分 1pt。端末ごとの行をチャンネルごとに合算してから計算する）
       const byChannel = new Map();
       for (const row of statsData ?? []) {
-        const cur = byChannel.get(row.channel_id) ?? { name: "", avatarUrl: "", total: 0, live: 0, watchMs: 0, liveWatchMs: 0, comments: 0, fever: 0, spent: 0, first: Infinity };
+        const cur = byChannel.get(row.channel_id) ?? { name: "", avatarUrl: "", total: 0, live: 0, watchMs: 0, liveWatchMs: 0, comments: 0, fever: 0, cheer: 0, spent: 0, first: Infinity };
         cur.spent += Number(row.points_spent ?? 0);
         cur.first = Math.min(cur.first, Date.parse(row.first_watch_at) || Infinity);
         cur.watchMs += Number(row.watch_ms ?? 0);
         cur.liveWatchMs += Number(row.live_watch_ms ?? 0);
         cur.comments += Number(row.comment_send_count ?? 0);
         cur.fever += Number(row.fever_count ?? 0);
+        cur.cheer += Number(row.cheer_count ?? 0);
         cur.id = row.channel_id;
         cur.name = row.channels?.name ?? cur.name;
         cur.avatarUrl = row.channels?.avatar_url ?? cur.avatarUrl;
@@ -2549,13 +2624,14 @@ const { createClient } = window.supabase;
       if (profileData) {
         DUMMY.profile.displayName = profileData.display_name ?? "";
         DUMMY.profile.rankingOptIn = !!profileData.ranking_opt_in;
+        DUMMY.profile.indexOrder = Array.isArray(profileData.index_order) ? profileData.index_order : [];
       }
       DUMMY.channels = [...byChannel.values()].map((c) => {
         const liveMs = Math.max(0, Math.min(c.live, c.total));
         const points = Math.floor(liveMs / 60000) * 2 + Math.floor((c.total - liveMs) / 60000);
         return {
           id: c.id, name: c.name || "（名称不明）", avatarUrl: c.avatarUrl, points,
-          watchMs: c.watchMs, liveWatchMs: c.liveWatchMs, comments: c.comments, fever: c.fever,
+          watchMs: c.watchMs, liveWatchMs: c.liveWatchMs, comments: c.comments, fever: c.fever, cheer: c.cheer,
           spent: c.spent, firstWatchAt: Number.isFinite(c.first) ? c.first : 0,
         };
       });
