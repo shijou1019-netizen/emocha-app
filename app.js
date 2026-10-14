@@ -2050,6 +2050,23 @@ const { createClient } = window.supabase;
   //   どれも拡張機能がすでに数えて同期している値（user_channel_stats・user_daily_activity）から、
   //   ここで計算するだけ。新しい測定は要らない
   // ============================================================
+  // ストリーク（継続日数）: 見た・書いた日が続いた日数と最長。今日か昨日まで続いていれば「今」の値
+  function computeStreak(rows) {
+    const days = [...new Set(rows.filter((r) => r.watchMs > 0 || r.commentCount > 0).map((r) => r.date))].sort();
+    const dayNo = (d) => Math.round(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86_400_000);
+    let longest = 0, run = 0, prev = null;
+    for (const d of days) {
+      run = prev && dayNo(d) - dayNo(prev) === 1 ? run + 1 : 1;
+      longest = Math.max(longest, run);
+      prev = d;
+    }
+    const today = localDateString(Date.now());
+    const yesterday = localDateString(Date.now() - 86_400_000);
+    const current = prev === today || prev === yesterday ? run : 0;
+    const tier = current >= 30 ? "gold" : current >= 7 ? "silver" : current >= 3 ? "bronze" : "none";
+    return { current, longest, tier };
+  }
+
   // ============================================================
   // 📺 チャンネルごとのページ（ホームの一覧から開く。2026-10-14 依頼者）とインデックス
   //   段の決め方は拡張機能の src/core/index-badges.js と同じ（しきい値・周回）。**段の名前（モチーフ）は持ち込まない**（2026-10-10 依頼者決定:
