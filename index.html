@@ -311,34 +311,20 @@
     }
 
     /* ---------- ホーム ---------- */
-    .mascot-spot {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 10px 0 18px;
+    /* 横長のバナー（banner.webp 1200x400 = 3:1）。角を丸め、カードと同じ影 */
+    .app-banner {
+      margin: 6px 0 16px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     }
 
-    /* running-mascot.png は 6コマ横並び・1コマ 362x724（縦長）。先頭コマだけを静止表示して見守りポーズにする */
-    .mascot-sprite {
-      width: 60px;
-      height: 120px;
-      background-image: url("./running-mascot.png");
-      background-repeat: no-repeat;
-      background-size: 360px 120px;
-      background-position: 0 0;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      filter: drop-shadow(0 6px 14px rgba(255, 122, 24, 0.25));
-    }
-
-    .mascot-caption {
-      margin: 0;
-      font-size: 12.5px;
-      color: var(--text-sub);
-      font-weight: 600;
-      letter-spacing: 0.02em;
+    .app-banner img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 3 / 1;
+      object-fit: cover;
     }
 
     .sync-status {
@@ -1528,19 +1514,6 @@
       box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
 
-    /* マスコット */
-    .mascot-sprite {
-      filter: drop-shadow(0 0 16px rgba(255, 150, 40, 0.55));
-    }
-
-    .mascot-caption {
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.5;
-      text-align: center;
-      color: var(--text);
-      text-shadow: 0 0 12px rgba(120, 140, 255, 0.6);
-    }
 
     /* 統計カード: 左に丸い枠のアイコン、右にラベルと数値 */
     .stat-card {
@@ -1764,9 +1737,6 @@
       box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255, 190, 230, 0.12);
     }
 
-    .mascot-sprite {
-      filter: drop-shadow(0 0 16px rgba(240, 83, 155, 0.5));
-    }
 
     .stat-icon {
       background: radial-gradient(circle at 35% 30%, rgba(200, 160, 255, 0.5), rgba(40, 22, 90, 0.92));
@@ -1958,33 +1928,6 @@
     .emo-note .heatmap-detail-date { color: #3b2f8a; }
     .emo-note .heatmap-detail-row { color: #4f4a7a; }
 
-    /* マスコットの吹き出し（ラベンダーの紙に、上向きのしっぽ） */
-    .mascot-caption.emo-bubble {
-      position: relative;
-      margin-top: 6px;
-      padding: 8px 16px;
-      border: 1px solid rgba(124, 108, 220, 0.45);
-      border-radius: 999px;
-      background: linear-gradient(180deg, #efecfd, #e4dffa);
-      color: #3b2f8a;
-      font-size: 13px;
-      text-shadow: none;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), 0 0 18px rgba(240, 83, 155, 0.18);
-    }
-
-    .mascot-caption.emo-bubble::before {
-      content: "";
-      position: absolute;
-      top: -7px;
-      left: 50%;
-      width: 12px;
-      height: 12px;
-      border-top: 1px solid rgba(124, 108, 220, 0.45);
-      border-left: 1px solid rgba(124, 108, 220, 0.45);
-      background: #efecfd;
-      transform: translateX(-50%) rotate(45deg);
-    }
-
     /* ============================================================
      * 明るいラベンダー（昼）（2026-10-09 依頼者「画面が暗い」→ 2 案を見比べて B に決定）
      *   淡いラベンダーの地に白いカード、濃い文字。上の「えもちゃテイスト」（暗い夜の版）の上に重ねて上書きする
@@ -2018,7 +1961,7 @@
       box-shadow: var(--card-shadow);
     }
 
-    #dashboard :is(.view-title, .card-section-head h3, .mascot-caption) { text-shadow: none; }
+    #dashboard :is(.view-title, .card-section-head h3) { text-shadow: none; }
 
     #dashboard :is(.stat-card .stat-value, .streak-count, .points-total-value) {
       background: linear-gradient(135deg, #d6338a 0%, #5b5bd6 60%, #7c4ddb 100%);
@@ -2069,9 +2012,9 @@
 
       <!-- 🏠 ホーム -->
       <section class="view" id="view-home" data-view="home">
-        <div class="mascot-spot">
-          <div class="mascot-sprite" role="img" aria-label="実績を見守るマスコット"></div>
-          <p class="mascot-caption emo-bubble">今日もがんばるあなたを見守っています！✦</p>
+        <!-- 横長のバナー（X のヘッダー v3 と同じ絵。2026-10-14 依頼者: ハムスターと吹き出しをやめてバナーに） -->
+        <div class="app-banner">
+          <img src="./banner.webp" alt="えもちゃっとライブ ― ライブ配信のチャット欄が、盛り上がりに合わせて光る。" width="1200" height="400" />
         </div>
 
         <p class="sync-status" id="homeSyncStatus" hidden></p>
