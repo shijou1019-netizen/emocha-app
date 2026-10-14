@@ -311,7 +311,7 @@
     }
 
     /* ---------- ホーム ---------- */
-    /* 横長のバナー（banner.webp 1200x400 = 3:1）。角を丸め、カードと同じ影 */
+    /* 横長のバナー（banner.webp 1200x300 = 4:1）。角を丸め、カードと同じ影 */
     .app-banner {
       margin: 6px 0 16px;
       border-radius: 16px;
@@ -323,7 +323,7 @@
       display: block;
       width: 100%;
       height: auto;
-      aspect-ratio: 3 / 1;
+      aspect-ratio: 4 / 1;
       object-fit: cover;
     }
 
@@ -1417,7 +1417,13 @@
     .nav-icon {
       font-size: 20px;
       line-height: 1;
+      display: block;
+      height: 24px;
     }
+
+    /* SVG のアイコン（案 A）: 青→紫→ピンクの面塗り。選択中は白 */
+    .nav-icon svg { width: 24px; height: 24px; fill: url(#navGrad); }
+    .nav-btn.is-active .nav-icon svg { fill: #ffffff; }
 
     .nav-label {
       font-size: 10px;
@@ -2019,9 +2025,9 @@
 
       <!-- 🏠 ホーム -->
       <section class="view" id="view-home" data-view="home">
-        <!-- 横長のバナー（X のヘッダー v3 と同じ絵。2026-10-14 依頼者: ハムスターと吹き出しをやめてバナーに） -->
+        <!-- 横長のバナー（ラベンダー地に白ねこと EmoChatLive のロゴ。2026-10-14 依頼者: ハムスターと吹き出しをやめてこのバナーに） -->
         <div class="app-banner">
-          <img src="./banner.webp" alt="えもちゃっとライブ ― ライブ配信のチャット欄が、盛り上がりに合わせて光る。" width="1200" height="400" />
+          <img src="./banner.webp" alt="EmoChatLive" width="1200" height="300" />
         </div>
 
         <p class="sync-status" id="homeSyncStatus" hidden></p>
@@ -2348,21 +2354,26 @@
         </div>
       </section>
 
+      <!-- 下のタブのアイコン: 絵文字をやめ、面塗りのグラデーション（案 A。2026-10-14 依頼者決定。比較は dev/nav-icons-compare.html）。
+           色はホームの数字のアイコンと同じ青→紫→ピンク。選択中は CSS で白にする -->
+      <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs><linearGradient id="navGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3b4de8"/><stop offset="0.55" stop-color="#9a4cf0"/><stop offset="1" stop-color="#ff5fb5"/></linearGradient></defs>
+      </svg>
       <nav class="bottom-nav" aria-label="メインナビゲーション">
         <button class="nav-btn is-active" data-tab="home" type="button">
-          <span class="nav-icon">🏠</span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 3 10.6V20a1.5 1.5 0 0 0 1.5 1.5H9.5V15h5v6.5h5A1.5 1.5 0 0 0 21 20v-9.4z"/></svg></span>
           <span class="nav-label">ホーム</span>
         </button>
         <button class="nav-btn" data-tab="ranking" type="button">
-          <span class="nav-icon">👑</span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5 7.5 12 12 5l4.5 7L21 8.5 19.2 18H4.8z"/><rect x="4.8" y="19" width="14.4" height="2.2" rx="1"/></svg></span>
           <span class="nav-label">ランキング</span>
         </button>
         <button class="nav-btn" data-tab="log" type="button">
-          <span class="nav-icon">📊</span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="4.5" height="9" rx="1.2"/><rect x="9.75" y="6" width="4.5" height="15" rx="1.2"/><rect x="16.5" y="9" width="4.5" height="12" rx="1.2"/></svg></span>
           <span class="nav-label">ログ</span>
         </button>
         <button class="nav-btn" data-tab="settings" type="button">
-          <span class="nav-icon">⚙️</span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2.5l1.6 2.3 2.7-.7 .9 2.6 2.6.9-.7 2.7L21.5 12l-2.3 1.6.7 2.7-2.6.9-.9 2.6-2.7-.7L12 21.5l-1.6-2.3-2.7.7-.9-2.6-2.6-.9.7-2.7L2.5 12l2.3-1.6-.7-2.7 2.6-.9.9-2.6 2.7.7zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></span>
           <span class="nav-label">設定</span>
         </button>
       </nav>
