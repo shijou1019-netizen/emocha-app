@@ -258,14 +258,37 @@ const { createClient } = window.supabase;
   });
 
   // ============================================================
+  // ホームの 3 つの数字のアイコン（SVG。絵文字をやめ、青→紫→ピンクのグラデーションのデフォルメした形に。2026-10-14 依頼者）
+  //   自前の固定の文字列なので innerHTML に入れてよい。グラデーションの id は 3 つで別にする（同じ画面に並ぶため）
+  // ============================================================
+  const STAT_ICON_DEFS = (id, stops) => `<defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0">${stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join("")}</linearGradient></defs>`;
+  const STAT_ICONS = {
+    // 炎: 外側の大きな炎（青→紫→ピンク）・内側の炎（ピンク→オレンジ）・光る芯（黄→白）
+    fever: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gFev1", [[0, "#3b4de8"], [0.5, "#9a4cf0"], [1, "#ff5fb5"]])}${STAT_ICON_DEFS("gFev2", [[0, "#ff5fb5"], [1, "#ffb347"]])}
+      <path fill="url(#gFev1)" d="M33 3c5 11 17 16 20 30 2 13-6 25-21 28C17 59 8 47 10 33c1-8 7-12 9-22 4 4 6 9 6 13 2-9 5-15 8-21zM13 30c-4 6-3 14 1 19-2-7 0-13-1-19zM53 28c-1 7 1 12-2 19 5-5 6-13 2-19z"/>
+      <path fill="url(#gFev2)" d="M32 22c4 7 12 11 12 22 0 8-6 14-12 14s-12-6-12-14c0-6 4-9 5-15 3 3 4 6 4 9 1-6 2-11 3-16z"/>
+      <circle cx="32" cy="47" r="6.5" fill="#fff0a8"/><circle cx="32" cy="47" r="3.5" fill="#ffffff"/></svg>`,
+    // コメント: 吹き出し（青→紫）＋ 右上にキラッとした星
+    comments: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gCom1", [[0, "#3b4de8"], [0.6, "#8a5cf0"], [1, "#ff7bd0"]])}
+      <path fill="url(#gCom1)" d="M14 12h30a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10H30l-11 10v-10h-5A10 10 0 0 1 4 34V22a10 10 0 0 1 10-10z"/>
+      <circle cx="19" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/><circle cx="29" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/><circle cx="39" cy="28" r="3.2" fill="#ffffff" opacity="0.95"/>
+      <path fill="#ffe36b" d="M52 4l2.2 5.8L60 12l-5.8 2.2L52 20l-2.2-5.8L44 12l5.8-2.2z"/></svg>`,
+    // 視聴時間: 時計の輪（青→紫→ピンク）に、流れ星のような針と右上の星
+    watch: `<svg viewBox="0 0 64 64" aria-hidden="true">${STAT_ICON_DEFS("gWat1", [[0, "#3b4de8"], [0.55, "#9a4cf0"], [1, "#ff5fb5"]])}
+      <circle cx="30" cy="34" r="22" fill="none" stroke="url(#gWat1)" stroke-width="7" stroke-linecap="round" stroke-dasharray="118 20" transform="rotate(-60 30 34)"/>
+      <path fill="url(#gWat1)" d="M30 18a3 3 0 0 1 3 3v12l8 5a3 3 0 0 1-3 5l-10-6a3 3 0 0 1-1-2V21a3 3 0 0 1 3-3z"/>
+      <path fill="#ffe36b" d="M51 6l2.4 6.6L60 15l-6.6 2.4L51 24l-2.4-6.6L42 15l6.6-2.4z"/></svg>`,
+  };
+
+  // ============================================================
   // 🏠 ホーム描画
   // ============================================================
   function renderHome() {
     const statGrid = document.getElementById("statGrid");
     const stats = [
-      { icon: "⏱️", value: formatMinutes(DUMMY.achievements.totalWatchMinutes), label: "累計視聴時間" },
-      { icon: "💬", value: formatCount(DUMMY.achievements.totalComments), label: "コメント送信数" },
-      { icon: "🔥", value: `${formatCount(DUMMY.achievements.hotMomentCount)} 回`, label: "激熱の経験回数" },
+      { icon: STAT_ICONS.watch, value: formatMinutes(DUMMY.achievements.totalWatchMinutes), label: "累計視聴時間" },
+      { icon: STAT_ICONS.comments, value: formatCount(DUMMY.achievements.totalComments), label: "コメント送信数" },
+      { icon: STAT_ICONS.fever, value: `${formatCount(DUMMY.achievements.hotMomentCount)} 回`, label: "激熱の経験回数" },
     ];
     statGrid.innerHTML = stats
       .map(

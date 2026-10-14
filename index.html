@@ -387,6 +387,13 @@
       line-height: 1;
     }
 
+    /* SVG のアイコン（app.js の STAT_ICONS）。丸の中に 72% の大きさで置き、少し光らせる */
+    .stat-icon svg {
+      width: 72%;
+      height: 72%;
+      filter: drop-shadow(0 2px 6px rgba(120, 80, 255, 0.35));
+    }
+
     .stat-value {
       font-size: 21px;
       font-weight: 800;
