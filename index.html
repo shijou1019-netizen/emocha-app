@@ -792,6 +792,9 @@
     }
 
     /* チャンネルの一覧の行（押せる）と、チャンネルのページ */
+    /* 一覧のアイコンは span の中に img を入れる形（channelAvatarEl）。丸の中に収める */
+    .points-channel-avatar { overflow: hidden; }
+    .points-channel-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
     .points-channel-row.is-link { cursor: pointer; }
     .points-channel-row.is-link::after { content: "›"; font-size: 18px; font-weight: 800; color: var(--text-sub); margin-left: 2px; }
     .points-channel-row.is-link:active { filter: brightness(0.96); }
