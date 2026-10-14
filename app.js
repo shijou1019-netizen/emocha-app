@@ -191,6 +191,7 @@ const { createClient } = window.supabase;
   //   無料枠の消費と、拡張機能の利用者への影響を小さく保つための仕組みでもある（1 人 1 日 1 回）。
   // ============================================================
   const SNAPSHOT_PREFIX = "emochat.web.snapshot:";
+  const SNAPSHOT_VERSION = 2; // 控えの形を変えたら上げる（古い形の控えは捨てて取り直す）。2 = 2026-10-14 チャンネルのページ（cheer_count・index_order）
   function snapshotKey(user, name) {
     return `${SNAPSHOT_PREFIX}${user.id}:${name}`;
   }
@@ -199,7 +200,7 @@ const { createClient } = window.supabase;
       const raw = localStorage.getItem(snapshotKey(user, name));
       if (!raw) return null;
       const saved = JSON.parse(raw);
-      if (!saved || saved.date !== localDateString(Date.now())) return null;
+      if (!saved || saved.v !== SNAPSHOT_VERSION || saved.date !== localDateString(Date.now())) return null;
       return saved;
     } catch {
       return null;
@@ -207,7 +208,7 @@ const { createClient } = window.supabase;
   }
   function writeSnapshot(user, name, payload) {
     try {
-      localStorage.setItem(snapshotKey(user, name), JSON.stringify({ date: localDateString(Date.now()), at: Date.now(), payload }));
+      localStorage.setItem(snapshotKey(user, name), JSON.stringify({ v: SNAPSHOT_VERSION, date: localDateString(Date.now()), at: Date.now(), payload }));
     } catch {
       // 容量いっぱい・プライベートモード等。控えが無いだけで、画面は普通に出る
     }
@@ -2681,7 +2682,9 @@ const { createClient } = window.supabase;
       statusEl.hidden = false;
       statusEl.classList.remove("is-loading");
       statusEl.classList.add("is-error");
-      statusEl.textContent = "実績を取得できませんでした。";
+      // 理由も出す（素人の運営者が問い合わせを受けた時に、画面の文言だけで原因が分かるように。2026-10-14）
+      const reason = [err?.code, err?.message || String(err)].filter(Boolean).join(" ");
+      statusEl.textContent = `実績を取得できませんでした。（${reason}）`;
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "retry-link";
