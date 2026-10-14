@@ -35,59 +35,41 @@ const { createClient } = window.supabase;
   "use strict";
 
   // ============================================================
-  // ダミーデータ（実績・今日のデータはログイン後、Supabase から取れた分だけ上書きする）
+  // 画面に出すデータの置き場（名前は試作時代の DUMMY のまま）
+  //   2026-10-15 まで架空の数字が入っていたが、ログイン前に本物のように見えてしまうのでやめた（第三者レビューの指摘）。
+  //   開いた直後・ログアウト後は空（applyStats(EMPTY_PAYLOAD)）、ログイン後は Supabase から取れた分で埋める。
   // ============================================================
   const DUMMY = {
     profile: {
-      displayName: "えもちゃっとファン",
-      rankingOptIn: true,
+      displayName: "",
+      rankingOptIn: false,
+      indexOrder: [],
     },
     plan: "free", // "free" | "premium"
     achievements: {
-      totalWatchMinutes: 18234, // 累計視聴時間
-      totalComments: 2481, // コメント送信数
-      hotMomentCount: 57, // 激熱の経験回数
+      totalWatchMinutes: 0, // 累計視聴時間
+      totalComments: 0, // コメント送信数
+      hotMomentCount: 0, // 激熱の経験回数
     },
     today: null, // { watchMs, commentCount, feverCount }（user_daily_activity。ログインして取れるまでは非表示）
-    dailyHistory: buildDummyDailyHistory(90), // [{ date, watchMs, feverCount }]（ヒートマップ用。直近90日）
-    // チャンネル別の累計（ログイン後は実データで上書き）。points はプレミアム中の視聴から計算した獲得ポイント
-    channels: [
-      { name: "ぴかぴかチャンネル", avatarUrl: "", watchMs: 5400 * 60000, liveWatchMs: 4100 * 60000, comments: 1320, fever: 31, points: 5280, spent: 1800, firstWatchAt: Date.now() - 330 * 86_400_000 },
-      { name: "ほしぞらラジオ", avatarUrl: "", watchMs: 2300 * 60000, liveWatchMs: 800 * 60000, comments: 540, fever: 14, points: 2140, spent: 600, firstWatchAt: Date.now() - 230 * 86_400_000 },
-      { name: "のんびり配信部", avatarUrl: "", watchMs: 900 * 60000, liveWatchMs: 650 * 60000, comments: 410, fever: 9, points: 760, spent: 100, firstWatchAt: Date.now() - 100 * 86_400_000 },
-      { name: "夜更かしゲーム部", avatarUrl: "", watchMs: 600 * 60000, liveWatchMs: 120 * 60000, comments: 150, fever: 3, points: 0, spent: 0, firstWatchAt: Date.now() - 31 * 86_400_000 },
-    ],
-    activity: buildDummyActivity(800), // [{ date, watchMs, commentCount, commonPoints, channelPoints }]（推し活グラフ用。ログイン後は実データで上書き）
+    dailyHistory: [], // [{ date, watchMs, feverCount }]（ヒートマップ用。直近90日）
+    // チャンネル別の累計。points はプレミアム中の視聴から計算した獲得ポイント
+    channels: [],
+    activity: [], // [{ date, watchMs, commentCount, commonPoints, channelPoints }]（推し活グラフ用）
     streak: {
-      current: 12,
-      longest: 30,
-      tier: "silver", // "gold" | "silver" | "bronze" | "none"
+      current: 0,
+      longest: 0,
+      tier: "none", // "gold" | "silver" | "bronze" | "none"
     },
-    // 獲得ポイント実績（ログイン後は実データで上書き）。common = 共通ポイントの累計獲得、
-    //   channels = チャンネルごとの累計獲得（視聴時間から計算）
+    // 獲得ポイント実績。common = 共通ポイント（廃止・常に 0）、channels = チャンネルごとの累計獲得（視聴時間から計算）
     points: {
-      common: 4000,
-      commonSpent: 1000,
-      channels: [
-        { name: "ぴかぴかチャンネル", avatarUrl: "", points: 5280 },
-        { name: "ほしぞらラジオ", avatarUrl: "", points: 2140 },
-        { name: "のんびり配信部", avatarUrl: "", points: 760 },
-      ],
+      common: 0,
+      commonSpent: 0,
+      channels: [],
     },
-    channelName: "ぴかぴかチャンネル",
-    ranking: [
-      { name: "ほしみるくん", points: 128400 },
-      { name: "つきよの民", points: 96200 },
-      { name: "あんずもち", points: 74850 },
-      { name: "れもんてぃー", points: 51200 },
-      { name: "えもちゃっとファン", points: 48930, isMe: true },
-      { name: "そらまめ太郎", points: 40110 },
-      { name: "きなこもち", points: 33520 },
-      { name: "ひつじ雲", points: 28870 },
-      { name: "みかんずきん", points: 21040 },
-      { name: "はなびら", points: 15600 },
-    ],
   };
+  // loadRealStats の fetcher が返す並びと同じ: [statsData, todayData, historyData, activityData, profileData]
+  const EMPTY_PAYLOAD = [[], null, [], [], null];
 
   const TIER_LABEL = { gold: "金クラス", silver: "銀クラス", bronze: "銅クラス", none: "クラス未認定" };
   const TIER_GOAL = { gold: Infinity, silver: 30, bronze: 7, none: 3 };
@@ -95,42 +77,6 @@ const { createClient } = window.supabase;
   const HEATMAP_DAYS = 90;
 
   
-  // 推し活グラフ用のダミー履歴（直近 days 日分。日ごとのムラは決まった式で作る＝開くたびに同じ形になる）
-  function buildDummyActivity(days) {
-    const rows = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const r = Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1);
-      const r2 = Math.abs((Math.sin(i * 78.233) * 12345.6789) % 1);
-      const watchMin = r > 0.18 ? Math.round(15 + r * 210) : 0;
-      rows.push({
-        date: localDateString(Date.now() - i * 86_400_000),
-        watchMs: watchMin * 60_000,
-        commentCount: Math.round(watchMin * (0.2 + r2 * 0.7)),
-        commonPoints: i % 6 === 0 ? 0 : 1000,
-        channelPoints: Math.round(watchMin * (0.8 + r2 * 0.9)),
-        feverCount: watchMin > 120 && r2 > 0.55 ? Math.round(r2 * 3) : 0,
-      });
-    }
-    return rows;
-  }
-
-  // ヒートマップ用のダミー履歴（直近 days 日分。曜日・週でムラのある波を適当に作る）
-  function buildDummyDailyHistory(days) {
-    const now = Date.now();
-    const list = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = localDateString(now - i * 86_400_000);
-      const wave = Math.abs(Math.sin(i * 0.35) * 0.6 + Math.sin(i * 1.7) * 0.4);
-      const active = wave > 0.32;
-      list.push({
-        date,
-        watchMs: active ? Math.round(wave * 4.5 * 3_600_000) : 0,
-        feverCount: active ? Math.round(wave * 9) : 0,
-      });
-    }
-    return list;
-  }
-
   // ============================================================
   // 小さなフォーマッタ
   // ============================================================
@@ -2520,7 +2466,9 @@ const { createClient } = window.supabase;
         setStatus("ログイン中");
         loadRealStats(user);
       } else {
+        emailEl.textContent = "";
         setStatus("未ログイン");
+        showLoggedOut(); // ログアウト後も前の人の数字が画面に残らないように（2026-10-15 第三者レビューの指摘）
       }
     }
 
@@ -2543,7 +2491,8 @@ const { createClient } = window.supabase;
       setStatus("ログアウトしています…", "loading");
       try {
         clearSnapshots(); // 端末に控えた記録を先に消す（共用の端末で次の人に見えないように）
-        const { error } = await supabase.auth.signOut();
+        // scope: "local" = このブラウザだけログアウト。省略すると全端末（パソコンの拡張機能も）切れてしまう（2026-10-15）
+        const { error } = await supabase.auth.signOut({ scope: "local" });
         if (error) throw error;
       } catch (err) {
         console.warn("[EmoChat] ログアウトに失敗しました", err);
@@ -2565,7 +2514,9 @@ const { createClient } = window.supabase;
 
     // 初回の呼び出しで、今の（復元できた）ログイン状態がすぐに届く（supabase-js v2 の仕様）
     supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") clearSnapshots(); // 他のタブでのログアウト・セッション切れでも控えを消す
+      // 他のタブでのログアウト・セッション切れでも控えを消す。閉じている間に切れた時は最初の通知（INITIAL_SESSION）で
+      //   session が null のまま届くので、イベント名でなく「ログインしていない」で判定する（2026-10-15）
+      if (!session) clearSnapshots();
       applyAuthState(session);
     });
   }
@@ -2607,89 +2558,9 @@ const { createClient } = window.supabase;
         for (const r of results) if (r.error) throw r.error;
         return results.map((r) => r.data ?? null);
       });
-      const [statsData, todayData, historyData, activityData, profileData] = payload;
-
-      const totals = (statsData ?? []).reduce(
-        (acc, row) => ({
-          watchMs: acc.watchMs + Number(row.watch_ms ?? 0),
-          commentCount: acc.commentCount + Number(row.comment_send_count ?? 0),
-          feverCount: acc.feverCount + Number(row.fever_count ?? 0),
-        }),
-        { watchMs: 0, commentCount: 0, feverCount: 0 },
-      );
-
-      // チャンネルごとの獲得ポイント（src/core/points.js の channelPointsBalance の「貯まった分」と同じ式。
-      //   ライブ視聴は毎分 2pt・アーカイブ視聴は毎分 1pt。端末ごとの行をチャンネルごとに合算してから計算する）
-      const byChannel = new Map();
-      for (const row of statsData ?? []) {
-        const cur = byChannel.get(row.channel_id) ?? { name: "", avatarUrl: "", total: 0, live: 0, watchMs: 0, liveWatchMs: 0, comments: 0, fever: 0, cheer: 0, spent: 0, first: Infinity };
-        cur.spent += Number(row.points_spent ?? 0);
-        cur.first = Math.min(cur.first, Date.parse(row.first_watch_at) || Infinity);
-        cur.watchMs += Number(row.watch_ms ?? 0);
-        cur.liveWatchMs += Number(row.live_watch_ms ?? 0);
-        cur.comments += Number(row.comment_send_count ?? 0);
-        cur.fever += Number(row.fever_count ?? 0);
-        cur.cheer += Number(row.cheer_count ?? 0);
-        cur.id = row.channel_id;
-        cur.name = row.channels?.name ?? cur.name;
-        cur.avatarUrl = row.channels?.avatar_url ?? cur.avatarUrl;
-        cur.total += Number(row.premium_watch_ms ?? 0);
-        cur.live += Number(row.premium_live_watch_ms ?? 0);
-        byChannel.set(row.channel_id, cur);
-      }
-      DUMMY.points.common = 0; // 共通ポイントは廃止（上のコメント参照）。ダミーの値を実データで消す
-      DUMMY.points.commonSpent = 0;
-      if (profileData) {
-        DUMMY.profile.displayName = profileData.display_name ?? "";
-        DUMMY.profile.rankingOptIn = !!profileData.ranking_opt_in;
-        DUMMY.profile.indexOrder = Array.isArray(profileData.index_order) ? profileData.index_order : [];
-      }
-      DUMMY.channels = [...byChannel.values()].map((c) => {
-        const liveMs = Math.max(0, Math.min(c.live, c.total));
-        const points = Math.floor(liveMs / 60000) * 2 + Math.floor((c.total - liveMs) / 60000);
-        return {
-          id: c.id, name: c.name || "（名称不明）", avatarUrl: c.avatarUrl, points,
-          watchMs: c.watchMs, liveWatchMs: c.liveWatchMs, comments: c.comments, fever: c.fever, cheer: c.cheer,
-          spent: c.spent, firstWatchAt: Number.isFinite(c.first) ? c.first : 0,
-        };
-      });
-      DUMMY.points.channels = DUMMY.channels.filter((c) => c.points > 0);
-
-      DUMMY.activity = (activityData ?? []).map((row) => ({
-        date: row.date,
-        watchMs: Number(row.watch_ms ?? 0),
-        commentCount: Number(row.comment_count ?? 0),
-        feverCount: Number(row.fever_count ?? 0),
-        commonPoints: 0, // 廃止（列が無い）
-        channelPoints: Number(row.channel_points ?? 0),
-      }));
-
-      DUMMY.streak = computeStreak(DUMMY.activity);
-      DUMMY.achievements.totalWatchMinutes = Math.round(totals.watchMs / 60000);
-      DUMMY.achievements.totalComments = totals.commentCount;
-      DUMMY.achievements.hotMomentCount = totals.feverCount;
-      DUMMY.today = todayData
-        ? {
-          watchMs: Number(todayData.watch_ms ?? 0),
-          commentCount: Number(todayData.comment_count ?? 0),
-          feverCount: Number(todayData.fever_count ?? 0),
-        }
-        : { watchMs: 0, commentCount: 0, feverCount: 0 };
-      DUMMY.dailyHistory = (historyData ?? []).map((row) => ({
-        date: row.date,
-        watchMs: Number(row.watch_ms ?? 0),
-        feverCount: Number(row.fever_count ?? 0),
-      }));
-
-      renderHome();
-      renderSettingsProfile();
+      applyStats(payload);
+      rerenderStats();
       loadTownData(user);
-      renderHeatmap();
-      renderGraph();
-      renderBreakdown();
-      renderViz();
-      renderSolid();
-      renderInsights();
       // いつの記録かを出しておく（1 日 1 回の更新なので「反映が遅い」と思われないように）
       statusEl.hidden = false;
       statusEl.classList.remove("is-loading");
@@ -2711,13 +2582,109 @@ const { createClient } = window.supabase;
     }
   }
 
+  // 取れたデータ（または EMPTY_PAYLOAD）で画面用のデータを入れ替える
+  function applyStats(payload) {
+    const [statsData, todayData, historyData, activityData, profileData] = payload;
+
+    const totals = (statsData ?? []).reduce(
+      (acc, row) => ({
+        watchMs: acc.watchMs + Number(row.watch_ms ?? 0),
+        commentCount: acc.commentCount + Number(row.comment_send_count ?? 0),
+        feverCount: acc.feverCount + Number(row.fever_count ?? 0),
+      }),
+      { watchMs: 0, commentCount: 0, feverCount: 0 },
+    );
+
+    // チャンネルごとの獲得ポイント（src/core/points.js の channelPointsBalance の「貯まった分」と同じ式。
+    //   ライブ視聴は毎分 2pt・アーカイブ視聴は毎分 1pt。端末ごとの行をチャンネルごとに合算してから計算する）
+    const byChannel = new Map();
+    for (const row of statsData ?? []) {
+      const cur = byChannel.get(row.channel_id) ?? { name: "", avatarUrl: "", total: 0, live: 0, watchMs: 0, liveWatchMs: 0, comments: 0, fever: 0, cheer: 0, spent: 0, first: Infinity };
+      cur.spent += Number(row.points_spent ?? 0);
+      cur.first = Math.min(cur.first, Date.parse(row.first_watch_at) || Infinity);
+      cur.watchMs += Number(row.watch_ms ?? 0);
+      cur.liveWatchMs += Number(row.live_watch_ms ?? 0);
+      cur.comments += Number(row.comment_send_count ?? 0);
+      cur.fever += Number(row.fever_count ?? 0);
+      cur.cheer += Number(row.cheer_count ?? 0);
+      cur.id = row.channel_id;
+      cur.name = row.channels?.name ?? cur.name;
+      cur.avatarUrl = row.channels?.avatar_url ?? cur.avatarUrl;
+      cur.total += Number(row.premium_watch_ms ?? 0);
+      cur.live += Number(row.premium_live_watch_ms ?? 0);
+      byChannel.set(row.channel_id, cur);
+    }
+    DUMMY.points.common = 0; // 共通ポイントは廃止（上のコメント参照）。ダミーの値を実データで消す
+    DUMMY.points.commonSpent = 0;
+    DUMMY.profile.displayName = profileData?.display_name ?? "";
+    DUMMY.profile.rankingOptIn = !!profileData?.ranking_opt_in;
+    DUMMY.profile.indexOrder = Array.isArray(profileData?.index_order) ? profileData.index_order : [];
+    DUMMY.channels = [...byChannel.values()].map((c) => {
+      const liveMs = Math.max(0, Math.min(c.live, c.total));
+      const points = Math.floor(liveMs / 60000) * 2 + Math.floor((c.total - liveMs) / 60000);
+      return {
+        id: c.id, name: c.name || "（名称不明）", avatarUrl: c.avatarUrl, points,
+        watchMs: c.watchMs, liveWatchMs: c.liveWatchMs, comments: c.comments, fever: c.fever, cheer: c.cheer,
+        spent: c.spent, firstWatchAt: Number.isFinite(c.first) ? c.first : 0,
+      };
+    });
+    DUMMY.points.channels = DUMMY.channels.filter((c) => c.points > 0);
+
+    DUMMY.activity = (activityData ?? []).map((row) => ({
+      date: row.date,
+      watchMs: Number(row.watch_ms ?? 0),
+      commentCount: Number(row.comment_count ?? 0),
+      feverCount: Number(row.fever_count ?? 0),
+      commonPoints: 0, // 廃止（列が無い）
+      channelPoints: Number(row.channel_points ?? 0),
+    }));
+
+    DUMMY.streak = computeStreak(DUMMY.activity);
+    DUMMY.achievements.totalWatchMinutes = Math.round(totals.watchMs / 60000);
+    DUMMY.achievements.totalComments = totals.commentCount;
+    DUMMY.achievements.hotMomentCount = totals.feverCount;
+    DUMMY.today = todayData
+      ? {
+        watchMs: Number(todayData.watch_ms ?? 0),
+        commentCount: Number(todayData.comment_count ?? 0),
+        feverCount: Number(todayData.fever_count ?? 0),
+      }
+      : { watchMs: 0, commentCount: 0, feverCount: 0 };
+    DUMMY.dailyHistory = (historyData ?? []).map((row) => ({
+      date: row.date,
+      watchMs: Number(row.watch_ms ?? 0),
+      feverCount: Number(row.fever_count ?? 0),
+    }));
+  }
+
+  // データを入れ替えた後に、それを使う画面を全部描き直す
+  function rerenderStats() {
+    renderHome();
+    renderSettingsProfile();
+    renderHeatmap();
+    renderGraph();
+    renderBreakdown();
+    renderViz();
+    renderSolid();
+    renderInsights();
+  }
+
+  // ログインしていない時の画面（開いた直後・ログアウト後）。数字は全部 0・一覧は空・ランキングは案内文
+  function showLoggedOut() {
+    applyStats(EMPTY_PAYLOAD);
+    rerenderStats();
+    renderRanking();
+    const statusEl = document.getElementById("homeSyncStatus");
+    statusEl.hidden = false;
+    statusEl.classList.remove("is-loading", "is-error");
+    statusEl.textContent = "ログインすると、あなたの記録が見られます。";
+  }
+
   setupAuth();
   setupGraph();
   setupViz();
   setupSolid();
-  renderInsights();
-  renderHome();
-  renderRanking();
+  showLoggedOut();
   renderLog();
   renderSettings();
 })();
