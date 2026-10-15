@@ -137,7 +137,7 @@ const { createClient } = window.supabase;
   //   無料枠の消費と、拡張機能の利用者への影響を小さく保つための仕組みでもある（1 人 1 日 1 回）。
   // ============================================================
   const SNAPSHOT_PREFIX = "emochat.web.snapshot:";
-  const SNAPSHOT_VERSION = 2; // 控えの形を変えたら上げる（古い形の控えは捨てて取り直す）。2 = 2026-10-14 チャンネルのページ（cheer_count・index_order）
+  const SNAPSHOT_VERSION = 3; // 控えの形を変えたら上げる（古い形の控えは捨てて取り直す）。2 = 2026-10-14 チャンネルのページ（cheer_count・index_order）/ 3 = 2026-10-15 一部失敗の控え（順位なし等）を捨てる
   function snapshotKey(user, name) {
     return `${SNAPSHOT_PREFIX}${user.id}:${name}`;
   }
@@ -2290,6 +2290,7 @@ const { createClient } = window.supabase;
   const BOARD_CHANNELS = 5;
 
   async function loadTownData(user) {
+    const gen = authGen;
     renderRankingMessage("読み込み中…");
     try {
       const crowns = { 1: "👑", 2: "🥈", 3: "🥉" };
@@ -2347,6 +2348,7 @@ const { createClient } = window.supabase;
         : `<li class="ranking-row"><div class="rank-info"><div class="rank-score">視聴した配信者がまだありません。</div></div></li>`;
     } catch (err) {
       console.warn("[EmoChat] ランキングを取得できませんでした", err);
+      if (gen !== authGen) return; // 通信の間にログアウト・別の人に替わった
       renderRankingMessage("取得できませんでした。しばらくしてからもう一度お試しください。");
     }
   }
@@ -2469,12 +2471,17 @@ const { createClient } = window.supabase;
       retryBtn.hidden = mode !== "error";
     }
 
+    let currentUid = null; // 今画面に出している人（null = 未ログイン）
     function applyAuthState(session) {
       const user = session?.user ?? null;
+      const uid = user?.id ?? null;
+      if (uid && uid === currentUid) return; // 同じ人のまま（トークンの更新など）。取り直さない
+      currentUid = uid;
       authGen++; // 走っている途中の通信の結果は捨てる（onceADay）
       loggedOutBox.hidden = !!user;
       loggedInBox.hidden = !user;
       if (user) {
+        showLoggedOut(); // 別の人に替わった時も、前の人の数字を取得が終わるまで残さない（先に空にしてから取りに行く）
         emailEl.textContent = user.email ?? "";
         setStatus("ログイン中");
         loadRealStats(user);
@@ -2539,6 +2546,7 @@ const { createClient } = window.supabase;
   //   ダミーの achievements・today を実データで上書きし、ホームタブを描画し直す
   // ============================================================
   async function loadRealStats(user) {
+    const gen = authGen; // 失敗した時も、ログイン状態が変わっていたら画面を触らない
     const statusEl = document.getElementById("homeSyncStatus");
     statusEl.hidden = false;
     statusEl.classList.remove("is-error");
@@ -2582,6 +2590,7 @@ const { createClient } = window.supabase;
       statusEl.textContent = `${formatSnapshotTime(at)} 時点の記録です（1 日 1 回更新）`;
     } catch (err) {
       console.warn("[EmoChat] 実績データを取得できませんでした", err);
+      if (gen !== authGen) return; // 通信の間にログアウト・別の人に替わった（画面はもう片付いている）
       statusEl.hidden = false;
       statusEl.classList.remove("is-loading");
       statusEl.classList.add("is-error");
@@ -2592,7 +2601,7 @@ const { createClient } = window.supabase;
       retry.type = "button";
       retry.className = "retry-link";
       retry.textContent = "もう一度試す";
-      retry.addEventListener("click", () => loadRealStats(user));
+      retry.addEventListener("click", () => { if (gen === authGen) loadRealStats(user); }); // 今もその人がログイン中の時だけ
       statusEl.append(retry);
     }
   }
