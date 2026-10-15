@@ -171,11 +171,17 @@ const { createClient } = window.supabase;
       // 読めない環境では何もしない
     }
   }
+  // ログイン状態の世代番号。ログイン・ログアウトのたびに増える。通信の前後で違っていたら、その結果は捨てる
+  //   （通信中にログアウトした・別の人に替わった時に、遅れて返った前の人の記録を描いたり控えたりしないように。2026-10-15 第三者レビュー）
+  let authGen = 0;
   // 今日の控えがあればそれを、無ければ fetcher() の結果を控えてから返す。戻り値 { payload, at }（at = 取った時刻）
+  //   通信の間にログイン状態が変わっていたら null（呼ぶ側は何もしない）
   async function onceADay(user, name, fetcher) {
     const saved = readSnapshot(user, name);
     if (saved) return { payload: saved.payload, at: saved.at };
+    const gen = authGen;
     const payload = await fetcher();
+    if (gen !== authGen) return null;
     writeSnapshot(user, name, payload);
     return { payload, at: Date.now() };
   }
@@ -1433,7 +1439,9 @@ const { createClient } = window.supabase;
     const counts = Array(BINS).fill(0);
     pos.forEach((v) => { counts[Math.min(BINS - 1, Math.floor((v / max) * BINS))]++; });
     const bars = [{ label: "0", count: zeros, color: "rgba(128,128,160,0.5)", range: "活動なし" }, ...counts.map((n, i) => ({
-      label: i > 0 && i % 2 === 0 ? graphAxisLabel(metric, (max * i) / BINS) : "", // i=0 は左端の「0」と同じ値なので出さない count: n, color: `rgb(${solidGold(i / (BINS - 1)).join(",")})`,
+      label: i > 0 && i % 2 === 0 ? graphAxisLabel(metric, (max * i) / BINS) : "", // i=0 は左端の「0」と同じ値なので出さない
+      count: n,
+      color: `rgb(${solidGold(i / (BINS - 1)).join(",")})`,
       range: `${graphFormat(metric, (max * i) / BINS)}〜`,
     }))];
     const left = 18, right = 306, base = 190, top = 24;
@@ -2285,21 +2293,25 @@ const { createClient } = window.supabase;
     renderRankingMessage("読み込み中…");
     try {
       const crowns = { 1: "👑", 2: "🥈", 3: "🥉" };
-      const { payload } = await onceADay(user, "town", async () => {
+      const got = await onceADay(user, "town", async () => {
         const [topRes, meRes] = await Promise.all([
           supabase.rpc("oshitown_ranking_top", { p_scope: "all", p_channel_id: null, p_metric: "watch", p_limit: 50 }),
           supabase.rpc("oshitown_ranking_my_rank", { p_scope: "all", p_channel_id: null, p_metric: "watch" }),
         ]);
+        // 一部だけ失敗した結果を 1 日分の控えに残さない（その日ずっと「順位なし」「まだ貼られていません」になるため）。全部そろった時だけ控える
         if (topRes.error) throw topRes.error;
+        if (meRes.error) throw meRes.error;
         const channels = (DUMMY.channels ?? []).filter((c) => c.id)
           .sort((a, b) => b.watchMs - a.watchMs).slice(0, BOARD_CHANNELS);
         const boards = await Promise.all(channels.map(async (c) => {
           const { data, error } = await supabase.rpc("oshitown_stamp_board_info", { p_channel_id: c.id, p_month: null });
-          return { c: { id: c.id, name: c.name }, info: error ? null : (data ?? [])[0] ?? null };
+          if (error) throw error;
+          return { c: { id: c.id, name: c.name }, info: (data ?? [])[0] ?? null };
         }));
-        return { rows: topRes.data ?? [], me: meRes.error ? null : (meRes.data ?? [])[0] ?? null, boards };
+        return { rows: topRes.data ?? [], me: (meRes.data ?? [])[0] ?? null, boards };
       });
-      const { rows, me, boards } = payload;
+      if (!got) return; // 通信の間にログアウトした（画面は showLoggedOut が片付け済み）
+      const { rows, me, boards } = got.payload;
       document.getElementById("rankingSubtitle").textContent = rows.length
         ? `全体の視聴時間ランキング（毎日 0 時の集計）${me ? ` ／ あなたは ${Number(me.out_rank)} 位` : ""}`
         : "まだランキングに参加している人がいません。";
@@ -2459,6 +2471,7 @@ const { createClient } = window.supabase;
 
     function applyAuthState(session) {
       const user = session?.user ?? null;
+      authGen++; // 走っている途中の通信の結果は捨てる（onceADay）
       loggedOutBox.hidden = !!user;
       loggedInBox.hidden = !user;
       if (user) {
@@ -2534,7 +2547,7 @@ const { createClient } = window.supabase;
 
     try {
       // 1 日 1 回だけ取りに行く（onceADay）。その日の 2 回目以降は端末の控えを出す
-      const { payload, at } = await onceADay(user, "stats", async () => {
+      const got = await onceADay(user, "stats", async () => {
         const today = localDateString(Date.now());
         const historyStart = localDateString(Date.now() - (HEATMAP_DAYS - 1) * 86_400_000);
         const results = await Promise.all([
@@ -2558,6 +2571,8 @@ const { createClient } = window.supabase;
         for (const r of results) if (r.error) throw r.error;
         return results.map((r) => r.data ?? null);
       });
+      if (!got) return; // 通信の間にログアウトした（画面は showLoggedOut が片付け済み）
+      const { payload, at } = got;
       applyStats(payload);
       rerenderStats();
       loadTownData(user);
@@ -2674,6 +2689,12 @@ const { createClient } = window.supabase;
     applyStats(EMPTY_PAYLOAD);
     rerenderStats();
     renderRanking();
+    // チャンネルのページも片付ける（開いたまま別のタブでログアウトした時に、前の人の配信者名・数字が残らないように）
+    document.getElementById("channelName").textContent = "";
+    document.getElementById("channelSince").textContent = "";
+    document.getElementById("channelStats").innerHTML = "";
+    document.getElementById("indexList").replaceChildren();
+    if (!document.getElementById("view-channel").hidden) activateTab("home");
     const statusEl = document.getElementById("homeSyncStatus");
     statusEl.hidden = false;
     statusEl.classList.remove("is-loading", "is-error");
