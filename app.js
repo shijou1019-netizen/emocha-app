@@ -4,7 +4,7 @@
 "use strict";
 
 // 版（設定タブに出す。拡張機能の package.json の版 + "-web"。tests/webapp.test.js が一致を確かめる）
-const WEB_VERSION = "0.16.1-web";
+const WEB_VERSION = "0.16.2-web";
 
 // 他のサイトの枠（iframe）の中で開かれたら、枠から抜け出す（クリックジャッキング対策。meta の CSP では frame-ancestors が効かないため）
 if (window.top !== window.self) {
