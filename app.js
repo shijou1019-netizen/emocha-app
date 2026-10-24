@@ -2981,8 +2981,10 @@ const { createClient } = window.supabase;
         slack: 60_000,
         rowValue: (row) => row.watchMs,
         markValue: (mark) => mark * 3_600_000,
-        markLabel: (mark) => `視聴 ${formatCount(mark)}時間`,
-        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}時間）まであと ${formatWatchDuration(remain)}`,
+        title: "⏱️ 視聴時間",
+        markText: (mark) => `${formatCount(mark)}時間`,
+        totalText: (v) => formatWatchDuration(v),
+        remainText: (v) => formatWatchDuration(v),
       },
       {
         metric: "comments",
@@ -2992,8 +2994,10 @@ const { createClient } = window.supabase;
         slack: 0,
         rowValue: (row) => row.commentCount,
         markValue: (mark) => mark,
-        markLabel: (mark) => `コメント ${formatCount(mark)}`,
-        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}）まであと ${formatCount(remain)}`,
+        title: "💬 コメント",
+        markText: (mark) => `${formatCount(mark)}件`,
+        totalText: (v) => `${formatCount(v)}件`,
+        remainText: (v) => `${formatCount(v)}件`,
       },
       {
         metric: "fever",
@@ -3003,8 +3007,10 @@ const { createClient } = window.supabase;
         slack: 0,
         rowValue: (row) => row.feverCount,
         markValue: (mark) => mark,
-        markLabel: (mark) => `激熱 ${formatCount(mark)}回`,
-        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}回）まであと ${formatCount(remain)}回`,
+        title: "🔥 激熱",
+        markText: (mark) => `${formatCount(mark)}回`,
+        totalText: (v) => `${formatCount(v)}回`,
+        remainText: (v) => `${formatCount(v)}回`,
       },
     ];
     for (const spec of milestones) {
@@ -3020,33 +3026,45 @@ const { createClient } = window.supabase;
       }
       const complete = spec.lifeTotal <= spec.dailyTotal + spec.slack;
       const total = complete ? spec.dailyTotal : spec.lifeTotal;
-      let crossed = false;
-      if (complete) {
-        for (const mark of spec.marks) {
-          if (total < spec.markValue(mark) || !hits.has(mark)) continue;
-          crossed = true;
-          const line = logText("p", "log-milestone-line", `${spec.markLabel(mark)}: ${formatLogDate(hits.get(mark))}`);
-          line.dataset.mark = String(mark);
-          box.append(line);
-        }
-      } else if (spec.marks.some((mark) => total >= spec.markValue(mark))) {
-        crossed = true;
-        const unknown = logText("p", "log-milestone-line", "超えた日は、取り込んだ範囲では分かりません");
-        unknown.dataset.unknown = "1";
-        box.append(unknown);
-      }
       const next = spec.marks.find((mark) => total < spec.markValue(mark));
+      const prevMark = [...spec.marks].reverse().find((mark) => total >= spec.markValue(mark));
+      const head = document.createElement("div");
+      head.className = "log-ms-head";
+      head.append(logText("span", "log-ms-title", spec.title), logText("span", "log-ms-total", spec.totalText(total)));
+      box.append(head);
+      // 次の区切りまでの進み具合（前の区切りから次の区切りまでを 100% として）
+      if (next != null) {
+        const from = prevMark == null ? 0 : spec.markValue(prevMark);
+        const to = spec.markValue(next);
+        const track = document.createElement("div");
+        track.className = "log-ms-track";
+        const fill = document.createElement("div");
+        fill.className = "log-ms-fill";
+        fill.style.width = `${Math.max(2, Math.min(100, Math.round(((total - from) / (to - from)) * 100)))}%`;
+        track.append(fill);
+        box.append(track);
+      }
       const nextLine = document.createElement("p");
       nextLine.className = "log-milestone-next";
       if (next == null) {
-        nextLine.textContent = "次の区切りはありません";
+        nextLine.textContent = "すべての区切りを達成しました";
         nextLine.dataset.next = "none";
       } else {
-        nextLine.textContent = spec.nextLabel(next, spec.markValue(next) - total);
+        nextLine.textContent = `次の目標 ${spec.markText(next)} まで、あと ${spec.remainText(spec.markValue(next) - total)}`;
         nextLine.dataset.next = String(next);
       }
-      if (!crossed) nextLine.dataset.fresh = "1";
       box.append(nextLine);
+      // 超えた区切り（日付が分かるものは日付つき。古すぎて分からないものは日付なし）
+      const chips = document.createElement("div");
+      chips.className = "log-ms-chips";
+      for (const mark of spec.marks) {
+        if (total < spec.markValue(mark)) continue;
+        const date = complete && hits.has(mark) ? ` ${formatLogDate(hits.get(mark))}` : "";
+        const chip = logText("span", "log-ms-chip", `✓ ${spec.markText(mark)}${date}`);
+        chip.dataset.mark = String(mark);
+        chips.append(chip);
+      }
+      if (chips.childNodes.length) box.append(chips);
       body.append(box);
     }
   }

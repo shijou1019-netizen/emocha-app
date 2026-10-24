@@ -2192,14 +2192,16 @@
     /* /ログ: 激熱TOP */
 
     /* ログ: マイルストーン */
-    .log-milestone-line,
-    .log-milestone-next {
-      margin: 0 0 4px;
-      font-size: 12.5px;
-      font-weight: 700;
-      line-height: 1.45;
-      overflow-wrap: anywhere;
-    }
+    #logMilestoneBody [data-metric] { padding: 12px 0; border-top: 1px solid rgba(124, 92, 230, .18); }
+    #logMilestoneBody [data-metric]:first-child { border-top: 0; padding-top: 0; }
+    .log-ms-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .log-ms-title { font-size: 14px; font-weight: 800; }
+    .log-ms-total { font-size: 18px; font-weight: 800; color: #7c5ce6; font-variant-numeric: tabular-nums; }
+    .log-ms-track { height: 10px; border-radius: 999px; background: rgba(124, 92, 230, .15); overflow: hidden; margin-bottom: 8px; }
+    .log-ms-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #3b4de8, #9a4cf0 55%, #ff5fb5); }
+    .log-milestone-next { margin: 0 0 8px; font-size: 13px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+    .log-ms-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .log-ms-chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(124, 92, 230, .14); color: #5a3fc4; }
     /* /ログ: マイルストーン */
 
     /* ログ: 推し歴 */
