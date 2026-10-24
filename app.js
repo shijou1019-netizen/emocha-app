@@ -67,7 +67,7 @@ const { createClient } = window.supabase;
   const HEATMAP_DAYS = 90;
   const LOG_DAILY_PAGE = 14;
   const LOG_SIGNED_OUT = "ログインすると、あなたの記録が見られます。";
-  // 未ログイン・ログアウト後は false（4 枚のカードは数字を出さず案内文）。ログインして取り込み始めたら true
+  // 未ログイン・ログアウト後は false（ログのカードは数字を出さず案内文）。ログインして取り込み始めたら true
   let statsSignedIn = false;
   let logDailyShown = LOG_DAILY_PAGE;
 
@@ -2601,6 +2601,7 @@ const { createClient } = window.supabase;
         statsOf("log-day-watch", `視聴 ${formatWatchDuration(row.watchMs)}`),
         statsOf("log-day-comments", `コメント ${formatCount(row.commentCount)}`),
         statsOf("log-day-fever", `激熱 ${formatCount(row.feverCount)}回`),
+        ...(row.infernoCount > 0 ? [statsOf("log-day-inferno", `爆熱 ${formatCount(row.infernoCount)}回`)] : []),
         statsOf("log-day-points", `ポイント ${formatCount(row.channelPoints)} pt`),
       );
       item.append(logText("div", "log-day-date", formatLogDate(row.date)), stats);
@@ -2728,10 +2729,12 @@ const { createClient } = window.supabase;
     const watchBest = bestBy(rows, "watchMs");
     const commentBest = bestBy(rows, "commentCount");
     const feverBest = bestBy(rows, "feverCount");
+    const infernoBest = bestBy(rows, "infernoCount");
     const specs = [
       ["watch", "1日の最長視聴時間", watchBest ? `${formatWatchDuration(watchBest.watchMs)}（${formatLogDate(watchBest.date)}）` : ""],
       ["comments", "1日の最多コメント", commentBest ? `${formatCount(commentBest.commentCount)}（${formatLogDate(commentBest.date)}）` : ""],
       ["fever", "1日の最多激熱", feverBest ? `${formatCount(feverBest.feverCount)}回（${formatLogDate(feverBest.date)}）` : ""],
+      ["inferno", "1日の最多爆熱", infernoBest ? `${formatCount(infernoBest.infernoCount)}回（${formatLogDate(infernoBest.date)}）` : ""],
     ];
     for (const [kind, label, value] of specs) {
       const line = document.createElement("p");
@@ -2750,11 +2753,402 @@ const { createClient } = window.supabase;
     body.append(streak);
   }
 
+  // ログ: 曜日
+  // 記録のある日だけを曜日に分ける（記録の無い日は 0 として平均に入れない）。横棒は、その曜日の平均 ÷ いちばん長い平均。
+  function renderLogWeekday() {
+    const body = document.getElementById("logWeekdayBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = activityNewestFirst();
+    if (!rows.length) {
+      body.append(logText("p", "points-empty", "まだ曜日の記録がありません"));
+      return;
+    }
+    const buckets = Array.from({ length: 7 }, () => ({ watchMs: 0, commentCount: 0, count: 0 }));
+    const seen = new Map();
+    for (const row of rows) {
+      const cur = seen.get(row.date) ?? { watchMs: 0, commentCount: 0 };
+      cur.watchMs += row.watchMs;
+      cur.commentCount += row.commentCount;
+      seen.set(row.date, cur);
+    }
+    for (const [date, row] of seen) {
+      const y = Number(date.slice(0, 4));
+      const m = Number(date.slice(5, 7));
+      const d = Number(date.slice(8, 10));
+      const dow = new Date(y, m - 1, d).getDay();
+      const bucket = buckets[dow];
+      bucket.watchMs += Math.max(0, row.watchMs);
+      bucket.commentCount += Math.max(0, row.commentCount);
+      bucket.count += 1;
+    }
+    const labels = ["日", "月", "火", "水", "木", "金", "土"];
+    const names = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const avgOf = (bucket) => (bucket.count ? { watch: bucket.watchMs / bucket.count, comments: bucket.commentCount / bucket.count } : null);
+    let maxWatch = 0;
+    let maxComments = 0;
+    for (const dow of order) {
+      const avg = avgOf(buckets[dow]);
+      if (!avg) continue;
+      if (avg.watch > maxWatch) maxWatch = avg.watch;
+      if (avg.comments > maxComments) maxComments = avg.comments;
+    }
+    const formatAvg = (n) => {
+      const rounded = Math.round(n * 10) / 10;
+      if (Number.isInteger(rounded)) return formatCount(rounded);
+      return rounded.toLocaleString("ja-JP", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    };
+    const bar = (pct, comments) => {
+      const track = document.createElement("div");
+      track.className = "log-weekday-track";
+      track.setAttribute("aria-hidden", "true");
+      const fill = document.createElement("div");
+      fill.className = comments ? "log-weekday-bar is-comments" : "log-weekday-bar";
+      fill.style.width = `${pct}%`;
+      track.append(fill);
+      return track;
+    };
+    let best = null;
+    for (const dow of order) {
+      const avg = avgOf(buckets[dow]);
+      const box = document.createElement("div");
+      box.className = "log-weekday";
+      box.dataset.weekday = String(dow);
+      box.append(logText("p", "log-weekday-label", labels[dow]));
+      if (!avg) {
+        const empty = logText("p", "log-weekday-avg", "記録なし");
+        empty.dataset.kind = "empty";
+        box.append(empty);
+      } else {
+        const watchText = logText("p", "log-weekday-avg", `視聴の平均 ${formatWatchDuration(avg.watch)}`);
+        watchText.dataset.kind = "watch";
+        const commentText = logText("p", "log-weekday-avg", `コメントの平均 ${formatAvg(avg.comments)}`);
+        commentText.dataset.kind = "comments";
+        const watchPct = maxWatch > 0 ? Math.round((avg.watch / maxWatch) * 100) : 0;
+        const commentPct = maxComments > 0 ? Math.round((avg.comments / maxComments) * 100) : 0;
+        box.append(watchText, bar(watchPct, false), commentText, bar(commentPct, true));
+        if (!best || avg.watch > best.watch || (avg.watch === best.watch && avg.comments > best.comments)) {
+          best = { dow, watch: avg.watch, comments: avg.comments };
+        }
+      }
+      body.append(box);
+    }
+    if (best) {
+      const most = logText("p", "log-weekday-most", `いちばん多い曜日: ${names[best.dow]}（視聴の平均 ${formatWatchDuration(best.watch)}）`);
+      most.dataset.field = "most";
+      body.append(most);
+    }
+  }
+  // /ログ: 曜日
+
+  // ログ: 週
+  // 月曜はじまり。引数の日付文字列は端末の暦日（YYYY-MM-DD）。UTC の日付にはしない。
+  function logWeekStartMonday(date) {
+    const y = Number(date.slice(0, 4));
+    const m = Number(date.slice(5, 7));
+    const d = Number(date.slice(8, 10));
+    const dt = new Date(y, m - 1, d);
+    const back = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+    dt.setDate(dt.getDate() - back);
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  }
+
+  function logAddDays(date, days) {
+    const y = Number(date.slice(0, 4));
+    const m = Number(date.slice(5, 7));
+    const d = Number(date.slice(8, 10));
+    const dt = new Date(y, m - 1, d + days);
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  }
+
+  function renderLogWeek() {
+    const body = document.getElementById("logWeekBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = activityNewestFirst();
+    const thisMonday = logWeekStartMonday(localDateString(Date.now()));
+    const starts = [];
+    for (let i = 0; i < 8; i++) starts.push(logAddDays(thisMonday, -7 * i));
+    const sumBetween = (start, end) => {
+      const sum = { watchMs: 0, commentCount: 0, feverCount: 0 };
+      for (const row of rows) {
+        if (row.date < start || row.date >= end) continue;
+        sum.watchMs += Math.max(0, row.watchMs);
+        sum.commentCount += Math.max(0, row.commentCount);
+        sum.feverCount += Math.max(0, row.feverCount);
+      }
+      return sum;
+    };
+    const sums = starts.map((start) => sumBetween(start, logAddDays(start, 7)));
+    sums.forEach((sum, i) => {
+      const line = logText(
+        "p",
+        "log-week-line",
+        `${formatLogDate(starts[i])}の週: 視聴 ${formatWatchDuration(sum.watchMs)}・コメント ${formatCount(sum.commentCount)}・激熱 ${formatCount(sum.feverCount)}回`,
+      );
+      line.dataset.week = starts[i];
+      body.append(line);
+    });
+    const cur = sums[0];
+    const prev = sums[1];
+    const delta = logText(
+      "p",
+      "log-week-delta",
+      `先週との差: 視聴 ${formatDelta(cur.watchMs - prev.watchMs, "watch")}・コメント ${formatDelta(cur.commentCount - prev.commentCount, "count")}・激熱 ${formatDelta(cur.feverCount - prev.feverCount, "count")}`,
+    );
+    delta.dataset.field = "delta";
+    body.append(delta);
+  }
+  // /ログ: 週
+
+  // ログ: 激熱TOP
+  function renderLogFeverTop() {
+    const body = document.getElementById("logFeverTopBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const byDate = new Map();
+    for (const row of activityNewestFirst()) {
+      const cur = byDate.get(row.date) ?? { date: row.date, feverCount: 0 };
+      cur.feverCount += Math.max(0, row.feverCount);
+      byDate.set(row.date, cur);
+    }
+    const ranked = [...byDate.values()]
+      .filter((row) => row.feverCount > 0)
+      .sort((a, b) => b.feverCount - a.feverCount || (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+      .slice(0, 5);
+    if (!ranked.length) {
+      body.append(logText("p", "points-empty", "まだ激熱の記録はありません"));
+      return;
+    }
+    ranked.forEach((row, i) => {
+      const line = logText("p", "log-fever-line", `${i + 1}. ${formatLogDate(row.date)}（${formatCount(row.feverCount)}回）`);
+      line.dataset.rank = String(i + 1);
+      line.dataset.date = row.date;
+      body.append(line);
+    });
+  }
+  // /ログ: 激熱TOP
+
+  // ログ: マイルストーン
+  // 区切りは、その日の終わりの累計が初めてその値以上になった日。次の区切りまでは、いまの累計との差。
+  // チャンネルの累計より日別の合計が 1 分以上短い時は、古い日が取り込み範囲の外なので、超えた日は出さない。
+  function renderLogMilestone() {
+    const body = document.getElementById("logMilestoneBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const byDate = new Map();
+    for (const row of activityNewestFirst()) {
+      const cur = byDate.get(row.date) ?? { date: row.date, watchMs: 0, commentCount: 0, feverCount: 0 };
+      cur.watchMs += Math.max(0, row.watchMs);
+      cur.commentCount += Math.max(0, row.commentCount);
+      cur.feverCount += Math.max(0, row.feverCount);
+      byDate.set(row.date, cur);
+    }
+    const ordered = [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const daily = { watchMs: 0, commentCount: 0, feverCount: 0 };
+    for (const row of ordered) {
+      daily.watchMs += row.watchMs;
+      daily.commentCount += row.commentCount;
+      daily.feverCount += row.feverCount;
+    }
+    const life = { watchMs: 0, commentCount: 0, feverCount: 0 };
+    for (const ch of DUMMY.channels) {
+      life.watchMs += Math.max(0, ch.watchMs);
+      life.commentCount += Math.max(0, ch.comments);
+      life.feverCount += Math.max(0, ch.fever);
+    }
+    const milestones = [
+      {
+        metric: "watch",
+        marks: [10, 50, 100, 500, 1000],
+        lifeTotal: life.watchMs,
+        dailyTotal: daily.watchMs,
+        slack: 60_000,
+        rowValue: (row) => row.watchMs,
+        markValue: (mark) => mark * 3_600_000,
+        markLabel: (mark) => `視聴 ${formatCount(mark)}時間`,
+        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}時間）まであと ${formatWatchDuration(remain)}`,
+      },
+      {
+        metric: "comments",
+        marks: [100, 1000, 5000],
+        lifeTotal: life.commentCount,
+        dailyTotal: daily.commentCount,
+        slack: 0,
+        rowValue: (row) => row.commentCount,
+        markValue: (mark) => mark,
+        markLabel: (mark) => `コメント ${formatCount(mark)}`,
+        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}）まであと ${formatCount(remain)}`,
+      },
+      {
+        metric: "fever",
+        marks: [10, 100, 500],
+        lifeTotal: life.feverCount,
+        dailyTotal: daily.feverCount,
+        slack: 0,
+        rowValue: (row) => row.feverCount,
+        markValue: (mark) => mark,
+        markLabel: (mark) => `激熱 ${formatCount(mark)}回`,
+        nextLabel: (mark, remain) => `次の区切り（${formatCount(mark)}回）まであと ${formatCount(remain)}回`,
+      },
+    ];
+    for (const spec of milestones) {
+      const box = document.createElement("div");
+      box.dataset.metric = spec.metric;
+      const hits = new Map();
+      let run = 0;
+      for (const row of ordered) {
+        run += spec.rowValue(row);
+        for (const mark of spec.marks) {
+          if (!hits.has(mark) && run >= spec.markValue(mark)) hits.set(mark, row.date);
+        }
+      }
+      const complete = spec.lifeTotal <= spec.dailyTotal + spec.slack;
+      const total = complete ? spec.dailyTotal : spec.lifeTotal;
+      let crossed = false;
+      if (complete) {
+        for (const mark of spec.marks) {
+          if (total < spec.markValue(mark) || !hits.has(mark)) continue;
+          crossed = true;
+          const line = logText("p", "log-milestone-line", `${spec.markLabel(mark)}: ${formatLogDate(hits.get(mark))}`);
+          line.dataset.mark = String(mark);
+          box.append(line);
+        }
+      } else if (spec.marks.some((mark) => total >= spec.markValue(mark))) {
+        crossed = true;
+        const unknown = logText("p", "log-milestone-line", "超えた日は、取り込んだ範囲では分かりません");
+        unknown.dataset.unknown = "1";
+        box.append(unknown);
+      }
+      const next = spec.marks.find((mark) => total < spec.markValue(mark));
+      const nextLine = document.createElement("p");
+      nextLine.className = "log-milestone-next";
+      if (next == null) {
+        nextLine.textContent = "次の区切りはありません";
+        nextLine.dataset.next = "none";
+      } else {
+        nextLine.textContent = spec.nextLabel(next, spec.markValue(next) - total);
+        nextLine.dataset.next = String(next);
+      }
+      if (!crossed) nextLine.dataset.fresh = "1";
+      box.append(nextLine);
+      body.append(box);
+    }
+  }
+  // /ログ: マイルストーン
+
+  // ログ: 推し歴
+  function logHistoryAgo(thenMs, nowMs) {
+    const then = new Date(thenMs);
+    const now = new Date(nowMs);
+    let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth());
+    if (now.getDate() < then.getDate()) months -= 1;
+    if (months < 0) months = 0;
+    const years = Math.floor(months / 12);
+    const rest = months % 12;
+    return `${years}年${rest}か月前`;
+  }
+
+  function renderLogHistory() {
+    const body = document.getElementById("logHistoryBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = DUMMY.channels
+      .filter((ch) => ch.firstWatchAt > 0)
+      .sort((a, b) => a.firstWatchAt - b.firstWatchAt || String(a.name).localeCompare(String(b.name), "ja"));
+    if (!rows.length) {
+      body.append(logText("p", "points-empty", "まだ推し歴の記録はありません"));
+      return;
+    }
+    const list = document.createElement("ul");
+    list.className = "points-channel-list";
+    const now = Date.now();
+    for (const ch of rows) {
+      const item = document.createElement("li");
+      item.className = "log-history-row";
+      item.dataset.channel = ch.id;
+      const name = document.createElement("span");
+      name.className = "log-history-name";
+      name.textContent = ch.name;
+      const when = document.createElement("span");
+      when.className = "log-history-when";
+      when.textContent = `${formatLogDate(localDateString(ch.firstWatchAt))}（${logHistoryAgo(ch.firstWatchAt, now)}）`;
+      item.append(name, when);
+      list.append(item);
+    }
+    body.append(list);
+  }
+  // /ログ: 推し歴
+
+  // ログ: 応援
+  function renderLogCheer() {
+    const body = document.getElementById("logCheerBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = DUMMY.channels
+      .filter((ch) => ch.cheer > 0 || ch.spent > 0)
+      .sort((a, b) => b.cheer - a.cheer || b.spent - a.spent || String(a.name).localeCompare(String(b.name), "ja"));
+    if (!rows.length) {
+      body.append(logText("p", "points-empty", "まだ応援の記録はありません"));
+      return;
+    }
+    const list = document.createElement("ul");
+    list.className = "points-channel-list";
+    let cheer = 0;
+    let spent = 0;
+    for (const ch of rows) {
+      cheer += ch.cheer;
+      spent += ch.spent;
+      const item = document.createElement("li");
+      item.className = "log-cheer-row";
+      item.dataset.channel = ch.id;
+      const name = document.createElement("span");
+      name.className = "log-cheer-name";
+      name.textContent = ch.name;
+      const meta = document.createElement("span");
+      meta.className = "log-cheer-meta";
+      meta.textContent = `応援 ${formatCount(ch.cheer)}回・使ったポイント ${formatCount(ch.spent)}`;
+      item.append(name, meta);
+      list.append(item);
+    }
+    const total = logText("p", "log-cheer-total", `合計: 応援 ${formatCount(cheer)}回・使ったポイント ${formatCount(spent)}`);
+    total.dataset.field = "total";
+    body.append(list, total);
+  }
+  // /ログ: 応援
+
   function renderLogKinds() {
     renderLogDaily();
     renderLogMonth();
     renderLogChannels();
     renderLogRecords();
+    renderLogWeekday();
+    renderLogWeek();
+    renderLogFeverTop();
+    renderLogMilestone();
+    renderLogHistory();
+    renderLogCheer();
   }
 
   // ヒートマップのマスをタップした日が、見えている 14 日より古ければそこまで開いてから光らせる
@@ -2950,10 +3344,10 @@ const { createClient } = window.supabase;
         const [statsRes, activityRes, profileRes] = await Promise.all([
           // channels(...) は channel_id の外部キーで引く配信者名・アイコン。premium_* はチャンネルポイントの元（プレミアム中の視聴分）
           supabase.from("user_channel_stats")
-            .select("channel_id, watch_ms, comment_send_count, fever_count, live_watch_ms, first_watch_at, points_spent, premium_watch_ms, premium_live_watch_ms, cheer_count, channels(name, avatar_url)")
+            .select("channel_id, watch_ms, comment_send_count, fever_count, inferno_count, live_watch_ms, first_watch_at, points_spent, premium_watch_ms, premium_live_watch_ms, cheer_count, channels(name, avatar_url)")
             .eq("user_id", user.id),
           supabase.from("user_daily_activity")
-            .select("date, watch_ms, comment_count, fever_count, channel_points")
+            .select("date, watch_ms, comment_count, fever_count, inferno_count, channel_points")
             .eq("user_id", user.id).order("date", { ascending: false }).range(0, 999),
           // 自分のプロフィール（表示名・ランキング参加。設定タブに「見るだけ」で出す。変更は拡張機能から）
           supabase.from("profiles").select("display_name, ranking_opt_in, index_order").eq("user_id", user.id).maybeSingle(),
@@ -3070,6 +3464,7 @@ const { createClient } = window.supabase;
       watchMs: Number(row.watch_ms ?? 0),
       commentCount: Number(row.comment_count ?? 0),
       feverCount: Number(row.fever_count ?? 0),
+      infernoCount: Number(row.inferno_count ?? 0), // 爆熱（0064。拡張機能が送り始めるまでは 0）
       commonPoints: 0, // 廃止（列が無い）
       channelPoints: Number(row.channel_points ?? 0),
     }));
@@ -3107,7 +3502,7 @@ const { createClient } = window.supabase;
   function rerenderStats() {
     renderHome();
     renderSettingsProfile();
-    renderLogKinds(); // タブを開いていなくても、ログアウトで前の人の 4 枚が残らないようにする
+    renderLogKinds(); // タブを開いていなくても、ログアウトで前の人のログのカードが残らないようにする
     logDirty = true;
     const log = document.getElementById("view-log");
     const graph = document.getElementById("view-graph");
