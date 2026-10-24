@@ -2043,6 +2043,62 @@
     #dashboard .heatmap-cell.is-empty { background: transparent; }
     /* 白い紙の上ではラベンダー付箋が溶けるので、縁を少し濃く */
     #dashboard .emo-note { border-color: rgba(106, 91, 214, 0.55); }
+
+    /* 日別の棒を太くする時、はみ出した分は横に送る（2026-10-19） */
+    .graph-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 幅 340〜360px で文字が切れ、押す場所が小さい（380px まで同じ。2026-10-19） */
+    @media (max-width: 380px) {
+      #dashboard .stat-card:not(.span-2) .stat-label {
+        white-space: normal;
+        line-height: 1.3;
+      }
+      #dashboard .stat-card:not(.span-2) .stat-value {
+        font-size: 18px;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+      #dashboard .stat-card.span-2 .stat-value {
+        font-size: 22px;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+
+      #dashboard .seg-btn {
+        min-height: 44px;
+        line-height: 1.2;
+      }
+      #dashboard .back-btn,
+      #dashboard #logoutBtn,
+      #dashboard #authRetryBtn,
+      #dashboard .sync-status .retry-link {
+        min-height: 44px;
+        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #solidCard #solidType.solid-seg-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      #solidCard #solidLook.solid-seg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      #solidCard #solidType.solid-seg-grid .seg-btn,
+      #solidCard #solidLook.solid-seg-grid .seg-btn {
+        white-space: normal;
+        min-height: 44px;
+        height: auto;
+        padding: 6px 4px;
+      }
+
+      .heatmap-grid { grid-auto-columns: 28px; }
+      .heatmap-grid .heatmap-cell {
+        width: 28px;
+        height: 28px;
+      }
+    }
   </style>
 </head>
 
@@ -2109,6 +2165,60 @@
           <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">押すと、そのチャンネルの記録とインデックスが見られます。</p>
           <ul class="points-channel-list" id="channelList"></ul>
         </div>
+
+        <h2 class="view-title" style="margin-top:28px">⚙️ 設定</h2>
+
+        <div class="card settings-block">
+          <div id="authLoggedOut">
+            <button class="google-btn" id="googleLoginBtn" type="button">
+              <span class="google-mark"></span>
+              <span>Googleでログイン</span>
+            </button>
+          </div>
+          <div id="authLoggedIn" class="auth-user-row" hidden>
+            <span class="auth-user-email" id="authUserEmail"></span>
+            <button class="upgrade-btn" id="logoutBtn" type="button">ログアウト</button>
+          </div>
+          <p class="login-status" id="loginStatus">認証状態を確認中…</p>
+          <button class="upgrade-btn auth-retry-btn" id="authRetryBtn" type="button" hidden>もう一度試す</button>
+        </div>
+
+        <div class="card settings-block">
+          <h3>プロフィール</h3>
+          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;">このスマホ版は見るだけです。表示名やランキング参加の変更は、パソコンの拡張機能の設定ページから行えます。</p>
+          <div class="field">
+            <label class="field-label" for="displayNameInput">表示名</label>
+            <input class="field-input" id="displayNameInput" type="text" maxlength="20" readonly />
+          </div>
+          <!-- 有料版の案内（配信者ごとの表示名・現在のプラン）は、有料版を始めるまで出さない（2026-10-10 依頼者: 申請版に有料の入口を出さない）。
+               戻す時は、この p と下の「現在のプラン」の card の style="display:none" を外す -->
+          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;display:none;">プレミアム版では、配信者ごとに別の表示名にできます（拡張機能の「実績」タブで設定。24時間に1回まで変更可）。</p>
+          <div class="field toggle-row">
+            <div>
+              <span class="field-label" style="margin-bottom:2px;display:block;">ランキング参加</span>
+              <span class="toggle-desc">オフにすると他の人のランキングに表示されません</span>
+            </div>
+            <input class="toggle-switch" id="rankingOptInToggle" type="checkbox" role="switch" disabled />
+          </div>
+        </div>
+
+        <div class="card settings-block" style="display:none;">
+          <h3>現在のプラン</h3>
+          <div class="plan-badge-row">
+            <span class="plan-badge" id="planBadge"></span>
+            <button class="upgrade-btn" id="upgradeBtn" type="button">プレミアム版にアップグレード</button>
+          </div>
+        </div>
+
+        <div class="card settings-block">
+          <h3>このアプリについて</h3>
+          <p class="toggle-desc">えもちゃっとライブ スマホ版（見るだけ） <span id="webVersion"></span></p>
+          <p class="toggle-desc">日本国内の利用者に向けて提供しています。記録は 1 日 1 回、開いた時に取り込みます。</p>
+          <p class="toggle-desc">
+            <a href="https://shijou1019-netizen.github.io/emocha-site/terms.html" target="_blank" rel="noopener">利用規約</a> ／
+            <a href="https://shijou1019-netizen.github.io/emocha-site/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+          </p>
+        </div>
       </section>
 
       <!-- 📺 チャンネルのページ（ホームの一覧から開く。下のタブには無い） -->
@@ -2142,9 +2252,9 @@
         <ul class="ranking-list" id="boardList"></ul>
       </section>
 
-      <!-- 📊 ログ＆グラフ -->
+      <!-- 📊 ログ -->
       <section class="view" id="view-log" data-view="log" hidden>
-        <h2 class="view-title">📊 ログ＆グラフ</h2>
+        <h2 class="view-title">📊 ログ</h2>
 
         <div class="card card-section">
           <div class="card-section-head">
@@ -2167,6 +2277,11 @@
             <div class="heatmap-detail-row" id="heatmapDetailFever"></div>
           </div>
         </div>
+      </section>
+
+      <!-- 📈 グラフ -->
+      <section class="view" id="view-graph" data-view="graph" hidden>
+        <h2 class="view-title">📈 グラフ</h2>
 
         <div class="card card-section" id="graphCard">
           <div class="card-section-head">
@@ -2185,11 +2300,12 @@
           </div>
           <div class="seg seg-sm" id="graphKind" role="tablist" aria-label="ポイントの種類">
             <button type="button" class="seg-btn is-active" data-value="all">すべて</button>
-            <button type="button" class="seg-btn" data-value="common">共通</button>
             <button type="button" class="seg-btn" data-value="channel">チャンネル</button>
           </div>
           <div class="graph-summary" id="graphSummary"></div>
-          <svg class="graph-svg" id="graphSvg" viewBox="0 0 320 170" role="img" aria-label="推し活グラフ"></svg>
+          <div class="graph-scroll">
+            <svg class="graph-svg" id="graphSvg" viewBox="0 0 320 170" role="img" aria-label="推し活グラフ"></svg>
+          </div>
           <div class="graph-legend" id="graphLegend"></div>
           <p class="graph-detail" id="graphDetail">棒をタップすると内訳が見られます</p>
           <h4 class="points-channel-title">曜日ごとの傾向（1日あたりの平均）</h4>
@@ -2224,7 +2340,7 @@
           <div class="points-split">
             <div class="points-split-item">
               <span class="points-split-value" id="ledgerEarned">0 pt</span>
-              <span class="points-split-label">貯めた合計（共通＋チャンネル）</span>
+              <span class="points-split-label">貯めた合計</span>
             </div>
             <div class="points-split-item">
               <span class="points-split-value" id="ledgerSpent">0 pt</span>
@@ -2333,63 +2449,6 @@
         </div>
       </section>
 
-      <!-- ⚙️ 設定 -->
-      <section class="view" id="view-settings" data-view="settings" hidden>
-        <h2 class="view-title">⚙️ 設定</h2>
-
-        <div class="card settings-block">
-          <div id="authLoggedOut">
-            <button class="google-btn" id="googleLoginBtn" type="button">
-              <span class="google-mark"></span>
-              <span>Googleでログイン</span>
-            </button>
-          </div>
-          <div id="authLoggedIn" class="auth-user-row" hidden>
-            <span class="auth-user-email" id="authUserEmail"></span>
-            <button class="upgrade-btn" id="logoutBtn" type="button">ログアウト</button>
-          </div>
-          <p class="login-status" id="loginStatus">認証状態を確認中…</p>
-          <button class="upgrade-btn auth-retry-btn" id="authRetryBtn" type="button" hidden>もう一度試す</button>
-        </div>
-
-        <div class="card settings-block">
-          <h3>プロフィール</h3>
-          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;">このスマホ版は見るだけです。表示名やランキング参加の変更は、パソコンの拡張機能の設定ページから行えます。</p>
-          <div class="field">
-            <label class="field-label" for="displayNameInput">表示名</label>
-            <input class="field-input" id="displayNameInput" type="text" maxlength="20" readonly />
-          </div>
-          <!-- 有料版の案内（配信者ごとの表示名・現在のプラン）は、有料版を始めるまで出さない（2026-10-10 依頼者: 申請版に有料の入口を出さない）。
-               戻す時は、この p と下の「現在のプラン」の card の style="display:none" を外す -->
-          <p class="toggle-desc emo-note emo-note--help" style="margin:0 0 14px;display:none;">プレミアム版では、配信者ごとに別の表示名にできます（拡張機能の「実績」タブで設定。24時間に1回まで変更可）。</p>
-          <div class="field toggle-row">
-            <div>
-              <span class="field-label" style="margin-bottom:2px;display:block;">ランキング参加</span>
-              <span class="toggle-desc">オフにすると他の人のランキングに表示されません</span>
-            </div>
-            <input class="toggle-switch" id="rankingOptInToggle" type="checkbox" role="switch" disabled />
-          </div>
-        </div>
-
-        <div class="card settings-block" style="display:none;">
-          <h3>現在のプラン</h3>
-          <div class="plan-badge-row">
-            <span class="plan-badge" id="planBadge"></span>
-            <button class="upgrade-btn" id="upgradeBtn" type="button">プレミアム版にアップグレード</button>
-          </div>
-        </div>
-
-        <div class="card settings-block">
-          <h3>このアプリについて</h3>
-          <p class="toggle-desc">えもちゃっとライブ スマホ版（見るだけ） <span id="webVersion"></span></p>
-          <p class="toggle-desc">日本国内の利用者に向けて提供しています。記録は 1 日 1 回、開いた時に取り込みます。</p>
-          <p class="toggle-desc">
-            <a href="https://shijou1019-netizen.github.io/emocha-site/terms.html" target="_blank" rel="noopener">利用規約</a> ／
-            <a href="https://shijou1019-netizen.github.io/emocha-site/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
-          </p>
-        </div>
-      </section>
-
       <!-- 下のタブのアイコン: 絵文字をやめ、面塗りのグラデーション（案 A。2026-10-14 依頼者決定。比較は dev/nav-icons-compare.html）。
            色はホームの数字のアイコンと同じ青→紫→ピンク。選択中は CSS で白にする -->
       <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -2405,12 +2464,12 @@
           <span class="nav-label">ランキング</span>
         </button>
         <button class="nav-btn" data-tab="log" type="button">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="4.5" height="9" rx="1.2"/><rect x="9.75" y="6" width="4.5" height="15" rx="1.2"/><rect x="16.5" y="9" width="4.5" height="12" rx="1.2"/></svg></span>
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="3.4" rx="1.2"/><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/><rect x="4" y="16.6" width="10" height="3.4" rx="1.2"/></svg></span>
           <span class="nav-label">ログ</span>
         </button>
-        <button class="nav-btn" data-tab="settings" type="button">
-          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2.5l1.6 2.3 2.7-.7 .9 2.6 2.6.9-.7 2.7L21.5 12l-2.3 1.6.7 2.7-2.6.9-.9 2.6-2.7-.7L12 21.5l-1.6-2.3-2.7.7-.9-2.6-2.6-.9.7-2.7L2.5 12l2.3-1.6-.7-2.7 2.6-.9.9-2.6 2.7.7zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></span>
-          <span class="nav-label">設定</span>
+        <button class="nav-btn" data-tab="graph" type="button">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="4.5" height="9" rx="1.2"/><rect x="9.75" y="6" width="4.5" height="15" rx="1.2"/><rect x="16.5" y="9" width="4.5" height="12" rx="1.2"/></svg></span>
+          <span class="nav-label">グラフ</span>
         </button>
       </nav>
 

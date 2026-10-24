@@ -4,7 +4,7 @@
 "use strict";
 
 // 版（設定タブに出す。拡張機能の package.json の版 + "-web"。tests/webapp.test.js が一致を確かめる）
-const WEB_VERSION = "0.16.2-web";
+const WEB_VERSION = "0.16.3-web";
 
 // 他のサイトの枠（iframe）の中で開かれたら、枠から抜け出す（クリックジャッキング対策。meta の CSP では frame-ancestors が効かないため）
 if (window.top !== window.self) {
@@ -15,17 +15,7 @@ if (window.top !== window.self) {
   "use strict";
 
   document.getElementById("webVersion").textContent = `版 ${WEB_VERSION}`;
-
-  // 今は試作なので、決まった時間（3 秒）で閉じる。消えるアニメーション（0.65 秒）の後に、画面から外す
-  const loadingScreen = document.getElementById("loadingScreen");
-  const DUMMY_LOADING_TIME = 3000;
-
-  window.setTimeout(() => {
-    loadingScreen.classList.add("is-hidden");
-    window.setTimeout(() => {
-      loadingScreen.style.display = "none";
-    }, 700);
-  }, DUMMY_LOADING_TIME);
+  // 読み込み画面は、ここでは閉じない。準備ができてから本体側が閉じる（2026-10-19）
 })();
 
 // supabase-js（./vendor/supabase.js）。版は tests/webapp.test.js が package.json と一致することを確かめる
@@ -141,16 +131,22 @@ const { createClient } = window.supabase;
   function snapshotKey(user, name) {
     return `${SNAPSHOT_PREFIX}${user.id}:${name}`;
   }
-  function readSnapshot(user, name) {
+  // 日付が違っても返す（通信できない翌日に、きのうの画面を出すため。2026-10-19）。今日の分だけ使う時は readSnapshot
+  function readStoredSnapshot(user, name) {
     try {
       const raw = localStorage.getItem(snapshotKey(user, name));
       if (!raw) return null;
       const saved = JSON.parse(raw);
-      if (!saved || saved.v !== SNAPSHOT_VERSION || saved.date !== localDateString(Date.now())) return null;
+      if (!saved || saved.v !== SNAPSHOT_VERSION || !saved.payload || typeof saved.date !== "string") return null;
       return saved;
     } catch {
       return null;
     }
+  }
+  function readSnapshot(user, name) {
+    const saved = readStoredSnapshot(user, name);
+    if (!saved || saved.date !== localDateString(Date.now())) return null;
+    return saved;
   }
   function writeSnapshot(user, name, payload) {
     try {
@@ -190,12 +186,30 @@ const { createClient } = window.supabase;
     const pad2 = (n) => String(n).padStart(2, "0");
     return `${d.getMonth() + 1}月${d.getDate()}日 ${d.getHours()}:${pad2(d.getMinutes())}`;
   }
+  function formatSnapshotDay(date) {
+    const m = Number(String(date).slice(5, 7));
+    const d = Number(String(date).slice(8, 10));
+    if (!m || !d) return "";
+    return `${m}月${d}日`;
+  }
+
+  // 読み込み画面は、ログイン状態が分かってから閉じる。決まった秒数では待たない（2026-10-19）
+  let loadingClosed = false;
+  function hideLoadingScreen() {
+    if (loadingClosed) return;
+    loadingClosed = true;
+    const loadingScreen = document.getElementById("loadingScreen");
+    if (!loadingScreen) return;
+    loadingScreen.classList.add("is-hidden");
+    window.setTimeout(() => { loadingScreen.style.display = "none"; }, 700);
+  }
 
   // ============================================================
   // タブ切り替え
   // ============================================================
   const views = document.querySelectorAll(".view");
   const navButtons = document.querySelectorAll(".nav-btn");
+  let logDirty = true; // ログ・グラフは、どちらかのタブを開くまで描かない（2026-10-19）
 
   function activateTab(tab) {
     views.forEach((view) => {
@@ -207,6 +221,12 @@ const { createClient } = window.supabase;
       btn.classList.toggle("is-active", btn.dataset.tab === navTab);
     });
     document.querySelector(`.view[data-view="${tab}"]`)?.scrollTo?.(0, 0);
+    if (tab === "log" || tab === "graph") {
+      if (logDirty) renderLogCharts();
+      else solidSync();
+    } else {
+      solidStop();
+    }
   }
 
   navButtons.forEach((btn) => {
@@ -394,8 +414,8 @@ const { createClient } = window.supabase;
       const b = acc.get(key);
       const parts = metric === "points"
         ? [
-          ...(kind !== "channel" ? [{ id: "common", label: "共通", value: b.common }] : []),
-          ...(kind !== "common" ? [{ id: "channel", label: "チャンネル", value: b.channel }] : []),
+          // 共通ポイントは 2026-10-06 に廃止。帯はチャンネルだけ（2026-10-17 文書の整合レビュー A）
+          { id: "channel", label: "チャンネル", value: b.channel },
         ]
         : [{ id: "single", label: METRIC_LABEL[metric], value: b.value }];
       return { key, label: graphKeyLabel(period, key), parts, total: parts.reduce((sum, p) => sum + p.value, 0) };
@@ -437,7 +457,7 @@ const { createClient } = window.supabase;
   function renderGraph() {
     const { metric, period } = graphState;
     const series = graphSeries();
-    document.getElementById("graphKind").hidden = metric !== "points";
+    document.getElementById("graphKind").hidden = true; // ポイントの種類はチャンネルだけになったので、切り替えは出さない（2026-10-17）
 
     const total = series.reduce((sum, b) => sum + b.total, 0);
     const periodLabel = { day: "直近30日", month: "直近12か月", year: "直近5年" }[period];
@@ -489,11 +509,12 @@ const { createClient } = window.supabase;
       });
       svg.append(hit);
     });
+    fitGraphSvg(svg, series.length, plotW);
 
     const legend = document.getElementById("graphLegend");
     legend.replaceChildren();
     const legendParts = metric === "points"
-      ? [["common", "共通ポイント"], ["channel", "チャンネルポイント"]].filter(([id]) => graphState.kind === "all" || graphState.kind === id)
+      ? [["channel", "チャンネルポイント"]] // 共通ポイントは廃止（2026-10-17）
       : [["single", METRIC_LABEL[metric]]];
     for (const [id, text] of legendParts) {
       const item = document.createElement("span");
@@ -631,6 +652,17 @@ const { createClient } = window.supabase;
     }
   }
 
+  // 狭い幅では、棒が多い時だけ横に送って 1 本を太くする（2026-10-19）
+  function fitGraphSvg(svg, seriesLength, plotW) {
+    const narrow = window.matchMedia("(max-width: 380px)").matches;
+    if (!narrow || seriesLength <= 0) {
+      svg.style.width = "";
+      return;
+    }
+    const cssW = Math.ceil(32 * 320 / (plotW / seriesLength));
+    svg.style.width = cssW > 360 ? `${cssW}px` : "";
+  }
+
   function setupGraph() {
     document.getElementById("bdMetric").addEventListener("click", (e) => {
       const btn = e.target.closest(".seg-btn");
@@ -639,7 +671,6 @@ const { createClient } = window.supabase;
       document.querySelectorAll("#bdMetric .seg-btn").forEach((b) => b.classList.toggle("is-active", b === btn));
       renderBreakdown();
     });
-    renderBreakdown();
     for (const [id, key] of [["graphMetric", "metric"], ["graphPeriod", "period"], ["graphKind", "kind"]]) {
       document.getElementById(id).addEventListener("click", (e) => {
         const btn = e.target.closest(".seg-btn");
@@ -650,7 +681,6 @@ const { createClient } = window.supabase;
         renderGraph();
       });
     }
-    renderGraph();
   }
 
   // ============================================================
@@ -1094,7 +1124,7 @@ const { createClient } = window.supabase;
   function drawSankey(svg) {
     svg.setAttribute("viewBox", "0 0 320 250");
     const { common, commonSpent, channels } = DUMMY.points;
-    const sources = [{ name: "共通", earned: common, spent: Math.min(commonSpent, common), color: "#ff8cc6" }];
+    const sources = []; // 共通ポイントは廃止（常に 0）。貯めた元はチャンネルだけ（2026-10-17）
     DUMMY.channels
       .filter((c) => c.points > 0)
       .sort((a, b) => b.points - a.points)
@@ -1146,7 +1176,7 @@ const { createClient } = window.supabase;
     vizLabel(svg, "残り", { class: "v-label v-label-day", x: rx + rw + 6, y: remainTop + 10 });
     vizLabel(svg, `${formatCount(remainTotal)} pt`, { x: rx + rw + 6, y: remainTop + 21 });
     vizLabel(svg, "貯めた元", { x: lx - 6, y: 8, "text-anchor": "end" });
-    return "貯めたポイントの行き先。左が貯めた元（共通とチャンネル）、右が使った分と残りです。帯が太いほど量が多いです。";
+    return "貯めたポイントの行き先。左が貯めた元（チャンネルごと）、右が使った分と残りです。帯が太いほど量が多いです。";
   }
 
   function hslToCss(h) {
@@ -1489,7 +1519,6 @@ const { createClient } = window.supabase;
         renderViz();
       });
     }
-    renderViz();
   }
 
   // ============================================================
@@ -1506,6 +1535,8 @@ const { createClient } = window.supabase;
   let solidDragMoved = 0;
   let solidLastDraw = 0;
   let solidLastTick = 0;
+  let solidRaf = 0;
+  let solidRunning = false;
 
   function esc(text) {
     return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1787,7 +1818,7 @@ const { createClient } = window.supabase;
       }
     }
     const colors = isPoints ? [[255, 207, 51], [91, 155, 255]] : [[98, 231, 255], [131, 120, 255], [255, 108, 184]];
-    const names = isPoints ? ["共通", "チャンネル"] : ["上旬", "中旬", "下旬"];
+    const names = isPoints ? ["", "チャンネル"] : ["上旬", "中旬", "下旬"]; // 下の段（旧 共通ポイント）は常に 0 なので名前を出さない（2026-10-17）
     const max = Math.max(...[...parts.values()].map((a) => a.reduce((s, v) => s + v, 0)), 0);
     const items = [];
     keys.forEach((key, i) => {
@@ -1805,7 +1836,7 @@ const { createClient } = window.supabase;
         y0 += h;
       });
     });
-    return { items, floor: [[-7.4, -1.8], [7.4, -1.8], [7.4, 1.8], [-7.4, 1.8]], scale: 21, cy: 192, labels: true, note: isPoints ? "直近12か月の積み上げ（下が共通ポイント、上がチャンネルポイント）。ドラッグで回せます。" : "直近12か月の積み上げ（下から 上旬・中旬・下旬）。ドラッグで回せます。" };
+    return { items, floor: [[-7.4, -1.8], [7.4, -1.8], [7.4, 1.8], [-7.4, 1.8]], scale: 21, cy: 192, labels: true, note: isPoints ? "直近12か月の積み上げ（チャンネルポイント）。ドラッグで回せます。" : "直近12か月の積み上げ（下から 上旬・中旬・下旬）。ドラッグで回せます。" };
   }
 
   // グループ: 上位 5 チャンネルを、視聴・コメント・激熱・ポイントの 4 本ずつの棒で見比べる（各項目は、自分の最大に合わせた高さ）
@@ -1939,9 +1970,41 @@ const { createClient } = window.supabase;
     solidFrame();
   }
 
+  // グラフのタブが見えていて、カードが画面の中にある時だけ回す（2026-10-19）
+  function solidCardVisible() {
+    const view = document.getElementById("view-graph");
+    const card = document.getElementById("solidCard");
+    if (!view || view.hidden || document.hidden || !card) return false;
+    const r = card.getBoundingClientRect();
+    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    return r.width > 0 && r.bottom > 0 && r.top < h;
+  }
+  function solidStart() {
+    if (solidRunning) return;
+    solidRunning = true;
+    solidLastTick = 0;
+    solidRaf = window.requestAnimationFrame(solidTick);
+  }
+  function solidStop() {
+    solidRunning = false;
+    if (solidRaf) window.cancelAnimationFrame(solidRaf);
+    solidRaf = 0;
+    solidLastTick = 0;
+  }
+  function solidSync() {
+    if (solidCardVisible()) solidStart();
+    else solidStop();
+  }
+
   function solidTick(t) {
+    if (!solidRunning) return;
+    if (!solidCardVisible()) {
+      solidStop();
+      return;
+    }
     const svg = document.getElementById("solidSvg");
-    if (svg && svg.getClientRects().length > 0 && !document.hidden) {
+    if (svg) {
+      if (!solidLastTick) solidLastTick = t;
       if (solidState.auto && !SOLID_REDUCED_MOTION) {
         solidState.angle += (t - solidLastTick) * 0.00028;
         solidDirty = true;
@@ -1953,7 +2016,8 @@ const { createClient } = window.supabase;
       }
     }
     solidLastTick = t;
-    requestAnimationFrame(solidTick);
+    if (!solidRunning) return;
+    solidRaf = window.requestAnimationFrame(solidTick);
   }
 
   function setupSolid() {
@@ -1969,7 +2033,9 @@ const { createClient } = window.supabase;
     const svg = document.getElementById("solidSvg");
     let dragging = false;
     let lastX = 0;
+    let solidDownIndex = NaN; // 押した柱の番号。回している間は図形が作り直され click が届かない（2026-10-19）
     svg.addEventListener("pointerdown", (e) => {
+      solidDownIndex = Number(e.target.dataset?.i);
       dragging = true;
       lastX = e.clientX;
       solidDragMoved = 0;
@@ -1985,18 +2051,21 @@ const { createClient } = window.supabase;
         solidDirty = true;
       }
     });
-    window.addEventListener("pointerup", () => { dragging = false; });
-    svg.addEventListener("click", (e) => {
-      if (solidDragMoved > 4) return; // ドラッグの終わりに出る click は、選んだことにしない
-      const i = Number(e.target.dataset?.i);
+    window.addEventListener("pointerup", () => {
+      if (!dragging) return;
+      dragging = false;
+      const i = solidDownIndex;
+      solidDownIndex = NaN;
+      if (solidDragMoved > 4) return; // ドラッグの終わりは、選んだことにしない
       if (!Number.isInteger(i) || !solidScene?.items[i]) return;
       solidState.selected = i;
       solidState.auto = false;
       document.getElementById("solidDetail").textContent = solidScene.items[i].text;
       solidDirty = true;
+      if (!solidRunning) solidFrame();
     });
-    renderSolid();
-    requestAnimationFrame(solidTick);
+    document.getElementById("view-graph").addEventListener("scroll", solidSync);
+    window.addEventListener("resize", solidSync);
   }
 
   // ============================================================
@@ -2289,11 +2358,57 @@ const { createClient } = window.supabase;
   // 寄せ書きを出す配信者の数（視聴時間の多い順。2026-10-14 依頼者決定: 上位だけにして呼び出しを減らす）
   const BOARD_CHANNELS = 5;
 
+  function paintTown(payload) {
+    const crowns = { 1: "👑", 2: "🥈", 3: "🥉" };
+    const rows = payload?.rows ?? [];
+    const me = payload?.me ?? null;
+    const boards = payload?.boards ?? [];
+    document.getElementById("rankingSubtitle").textContent = rows.length
+      ? `全体の視聴時間ランキング（毎日 0 時の集計）${me ? ` ／ あなたは ${Number(me.out_rank)} 位` : ""}`
+      : "まだランキングに参加している人がいません。";
+    document.getElementById("rankingList").innerHTML = rows.map((r, i) => {
+      const place = Number(r.out_rank);
+      const name = r.out_display_name || "（名前なし）";
+      return `
+        <li class="ranking-row${r.out_is_me ? " is-me" : ""}" data-place="${place <= 3 ? place : ""}">
+          <span class="rank-badge">${place}</span>
+          <span class="rank-avatar" style="background:${colorFor(i)}">${esc(initialOf(name))}</span>
+          <div class="rank-info">
+            <div class="rank-name">
+              ${crowns[place] ? `<span class="crown">${crowns[place]}</span>` : ""}
+              <span>${esc(name)}</span>
+              ${r.out_is_me ? `<span class="me-tag">あなた</span>` : ""}
+            </div>
+            <div class="rank-score">${esc(formatWatchDuration(Number(r.out_value)))}</div>
+          </div>
+        </li>`;
+    }).join("");
+
+    document.getElementById("boardList").innerHTML = boards.length
+      ? boards.map(({ c, info }) => `
+        <li class="ranking-row">
+          <span class="rank-avatar" style="background:${colorFor(0)}">${esc(initialOf(c.name))}</span>
+          <div class="rank-info">
+            <div class="rank-name"><span>${esc(c.name)}</span></div>
+            <div class="rank-score">${info
+              ? `貼られたスタンプ ${Number(info.out_stamp_count ?? 0)} 枚${info.out_reached_on ? "（節目に到達）" : ` ／ 目標 ${Number(info.out_target_hours)} 時間`}`
+              : "今月はまだ貼られていません"}</div>
+          </div>
+        </li>`).join("")
+      : `<li class="ranking-row"><div class="rank-info"><div class="rank-score">視聴した配信者がまだありません。</div></div></li>`;
+  }
+
+  function showStaleTown(user) {
+    const last = readStoredSnapshot(user, "town");
+    if (!last) return false;
+    paintTown(last.payload);
+    return true;
+  }
+
   async function loadTownData(user) {
     const gen = authGen;
     renderRankingMessage("読み込み中…");
     try {
-      const crowns = { 1: "👑", 2: "🥈", 3: "🥉" };
       const got = await onceADay(user, "town", async () => {
         const [topRes, meRes] = await Promise.all([
           supabase.rpc("oshitown_ranking_top", { p_scope: "all", p_channel_id: null, p_metric: "watch", p_limit: 50 }),
@@ -2312,43 +2427,11 @@ const { createClient } = window.supabase;
         return { rows: topRes.data ?? [], me: (meRes.data ?? [])[0] ?? null, boards };
       });
       if (!got) return; // 通信の間にログアウトした（画面は showLoggedOut が片付け済み）
-      const { rows, me, boards } = got.payload;
-      document.getElementById("rankingSubtitle").textContent = rows.length
-        ? `全体の視聴時間ランキング（毎日 0 時の集計）${me ? ` ／ あなたは ${Number(me.out_rank)} 位` : ""}`
-        : "まだランキングに参加している人がいません。";
-      document.getElementById("rankingList").innerHTML = rows.map((r, i) => {
-        const place = Number(r.out_rank);
-        const name = r.out_display_name || "（名前なし）";
-        return `
-        <li class="ranking-row${r.out_is_me ? " is-me" : ""}" data-place="${place <= 3 ? place : ""}">
-          <span class="rank-badge">${place}</span>
-          <span class="rank-avatar" style="background:${colorFor(i)}">${esc(initialOf(name))}</span>
-          <div class="rank-info">
-            <div class="rank-name">
-              ${crowns[place] ? `<span class="crown">${crowns[place]}</span>` : ""}
-              <span>${esc(name)}</span>
-              ${r.out_is_me ? `<span class="me-tag">あなた</span>` : ""}
-            </div>
-            <div class="rank-score">${esc(formatWatchDuration(Number(r.out_value)))}</div>
-          </div>
-        </li>`;
-      }).join("");
-
-      document.getElementById("boardList").innerHTML = boards.length
-        ? boards.map(({ c, info }) => `
-        <li class="ranking-row">
-          <span class="rank-avatar" style="background:${colorFor(0)}">${esc(initialOf(c.name))}</span>
-          <div class="rank-info">
-            <div class="rank-name"><span>${esc(c.name)}</span></div>
-            <div class="rank-score">${info
-              ? `貼られたスタンプ ${Number(info.out_stamp_count ?? 0)} 枚${info.out_reached_on ? "（節目に到達）" : ` ／ 目標 ${Number(info.out_target_hours)} 時間`}`
-              : "今月はまだ貼られていません"}</div>
-          </div>
-        </li>`).join("")
-        : `<li class="ranking-row"><div class="rank-info"><div class="rank-score">視聴した配信者がまだありません。</div></div></li>`;
+      paintTown(got.payload);
     } catch (err) {
       console.warn("[EmoChat] ランキングを取得できませんでした", err);
       if (gen !== authGen) return; // 通信の間にログアウト・別の人に替わった
+      if (showStaleTown(user)) return; // 通信できない時は、前回のランキングを出す（2026-10-19）
       renderRankingMessage("取得できませんでした。しばらくしてからもう一度お試しください。");
     }
   }
@@ -2472,11 +2555,15 @@ const { createClient } = window.supabase;
     }
 
     let currentUid = null; // 今画面に出している人（null = 未ログイン）
+    let currentUser = null;
+    let seenDay = localDateString(Date.now()); // 見えている間に日付が変わったら、1 回だけ取り直す（2026-10-19）
     function applyAuthState(session) {
       const user = session?.user ?? null;
       const uid = user?.id ?? null;
       if (uid && uid === currentUid) return; // 同じ人のまま（トークンの更新など）。取り直さない
+      if (uid && currentUid && uid !== currentUid) clearSnapshots(); // 別の人に替わった時だけ、前の人の控えを消す（2026-10-19）
       currentUid = uid;
+      currentUser = user;
       authGen++; // 走っている途中の通信の結果は捨てる（onceADay）
       loggedOutBox.hidden = !!user;
       loggedInBox.hidden = !user;
@@ -2489,6 +2576,7 @@ const { createClient } = window.supabase;
         emailEl.textContent = "";
         setStatus("未ログイン");
         showLoggedOut(); // ログアウト後も前の人の数字が画面に残らないように（2026-10-15 第三者レビューの指摘）
+        hideLoadingScreen();
       }
     }
 
@@ -2534,11 +2622,27 @@ const { createClient } = window.supabase;
 
     // 初回の呼び出しで、今の（復元できた）ログイン状態がすぐに届く（supabase-js v2 の仕様）
     supabase.auth.onAuthStateChange((event, session) => {
-      // 他のタブでのログアウト・セッション切れでも控えを消す。閉じている間に切れた時は最初の通知（INITIAL_SESSION）で
-      //   session が null のまま届くので、イベント名でなく「ログインしていない」で判定する（2026-10-15）
-      if (!session) clearSnapshots();
+      // 控えを消すのはログアウトの通知だけ。開いた直後の「セッション無し」では消さない（翌日オフラインできのうの画面を残す。2026-10-19）
+      if (event === "SIGNED_OUT") {
+        if (!session) clearSnapshots();
+      }
       applyAuthState(session);
     });
+
+    // タブに戻った時と、戻る操作でページが再び出た時。同じ日は 1 回だけ（2026-10-19）
+    const onSeenAgain = () => {
+      if (document.visibilityState !== "visible") {
+        solidStop();
+        return;
+      }
+      solidSync();
+      const today = localDateString(Date.now());
+      if (today === seenDay) return;
+      seenDay = today;
+      if (currentUser) loadRealStats(currentUser);
+    };
+    document.addEventListener("visibilitychange", onSeenAgain);
+    window.addEventListener("pageshow", onSeenAgain);
   }
 
   // ============================================================
@@ -2558,26 +2662,24 @@ const { createClient } = window.supabase;
       const got = await onceADay(user, "stats", async () => {
         const today = localDateString(Date.now());
         const historyStart = localDateString(Date.now() - (HEATMAP_DAYS - 1) * 86_400_000);
-        const results = await Promise.all([
+        // 日別は 1 回だけ取る。今日と直近90日は、その結果から分ける（2026-10-19）
+        // 共通ポイント（user_points・common_points 列）は 2026-10-06 に廃止（0042 で列を削除・0054 で表も削除）。読まない
+        const [statsRes, activityRes, profileRes] = await Promise.all([
           // channels(...) は channel_id の外部キーで引く配信者名・アイコン。premium_* はチャンネルポイントの元（プレミアム中の視聴分）
           supabase.from("user_channel_stats")
             .select("channel_id, watch_ms, comment_send_count, fever_count, live_watch_ms, first_watch_at, points_spent, premium_watch_ms, premium_live_watch_ms, cheer_count, channels(name, avatar_url)")
             .eq("user_id", user.id),
-          supabase.from("user_daily_activity").select("watch_ms, comment_count, fever_count")
-            .eq("user_id", user.id).eq("date", today).maybeSingle(),
-          // ヒートマップ用（直近 90 日分。1 日 1 行）
-          supabase.from("user_daily_activity").select("date, watch_ms, fever_count")
-            .eq("user_id", user.id).gte("date", historyStart).order("date", { ascending: true }),
-          // 共通ポイント（user_points・common_points 列）は 2026-10-06 に廃止（0042 で列を削除・0054 で表も削除）。読まない
-          // 推し活グラフ用の日別の全記録（新しい順に 1,000 日分まで）
           supabase.from("user_daily_activity")
             .select("date, watch_ms, comment_count, fever_count, channel_points")
             .eq("user_id", user.id).order("date", { ascending: false }).range(0, 999),
           // 自分のプロフィール（表示名・ランキング参加。設定タブに「見るだけ」で出す。変更は拡張機能から）
           supabase.from("profiles").select("display_name, ranking_opt_in, index_order").eq("user_id", user.id).maybeSingle(),
         ]);
-        for (const r of results) if (r.error) throw r.error;
-        return results.map((r) => r.data ?? null);
+        for (const r of [statsRes, activityRes, profileRes]) if (r.error) throw r.error;
+        const activityRows = activityRes.data ?? [];
+        const todayRow = activityRows.find((row) => row.date === today) ?? null;
+        const historyRows = activityRows.filter((row) => row.date >= historyStart);
+        return [statsRes.data ?? null, todayRow, historyRows, activityRows, profileRes.data ?? null];
       });
       if (!got) return; // 通信の間にログアウトした（画面は showLoggedOut が片付け済み）
       const { payload, at } = got;
@@ -2591,6 +2693,7 @@ const { createClient } = window.supabase;
     } catch (err) {
       console.warn("[EmoChat] 実績データを取得できませんでした", err);
       if (gen !== authGen) return; // 通信の間にログアウト・別の人に替わった（画面はもう片付いている）
+      if (showStaleStats(user, gen)) return; // 通信できない時は、最後の控えを日付つきで出す（2026-10-19）
       statusEl.hidden = false;
       statusEl.classList.remove("is-loading");
       statusEl.classList.add("is-error");
@@ -2603,7 +2706,29 @@ const { createClient } = window.supabase;
       retry.textContent = "もう一度試す";
       retry.addEventListener("click", () => { if (gen === authGen) loadRealStats(user); }); // 今もその人がログイン中の時だけ
       statusEl.append(retry);
+    } finally {
+      if (gen === authGen) hideLoadingScreen();
     }
+  }
+
+  // 取りに行けない時は、最後の控えを「○月○日 時点」と出して、ランキングも前回の分を試す（2026-10-19）
+  function showStaleStats(user, gen) {
+    const last = readStoredSnapshot(user, "stats");
+    if (!last) return false;
+    applyStats(last.payload);
+    rerenderStats();
+    const statusEl = document.getElementById("homeSyncStatus");
+    statusEl.hidden = false;
+    statusEl.classList.remove("is-loading", "is-error");
+    statusEl.textContent = `${formatSnapshotDay(last.date)} 時点の記録です（通信できないため、前回の記録を表示しています）`;
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "retry-link";
+    retry.textContent = "もう一度試す";
+    retry.addEventListener("click", () => { if (gen === authGen) loadRealStats(user); });
+    statusEl.append(retry);
+    loadTownData(user);
+    return true;
   }
 
   // 取れたデータ（または EMPTY_PAYLOAD）で画面用のデータを入れ替える
@@ -2681,16 +2806,26 @@ const { createClient } = window.supabase;
     }));
   }
 
-  // データを入れ替えた後に、それを使う画面を全部描き直す
-  function rerenderStats() {
-    renderHome();
-    renderSettingsProfile();
-    renderHeatmap();
+  // ログ・グラフは、どちらかのタブを開いている時だけ描く（2026-10-19）
+  function renderLogCharts() {
+    renderLog();
     renderGraph();
     renderBreakdown();
     renderViz();
     renderSolid();
     renderInsights();
+    logDirty = false;
+    solidSync();
+  }
+
+  function rerenderStats() {
+    renderHome();
+    renderSettingsProfile();
+    logDirty = true;
+    const log = document.getElementById("view-log");
+    const graph = document.getElementById("view-graph");
+    if ((log && !log.hidden) || (graph && !graph.hidden)) renderLogCharts();
+    else solidStop();
   }
 
   // ログインしていない時の画面（開いた直後・ログアウト後）。数字は全部 0・一覧は空・ランキングは案内文
@@ -2715,7 +2850,6 @@ const { createClient } = window.supabase;
   setupViz();
   setupSolid();
   showLoggedOut();
-  renderLog();
   renderSettings();
 })();
 

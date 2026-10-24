@@ -11,7 +11,7 @@
  *   Supabase からの応答（自分の視聴記録）は控えない。控えると、ログアウトしても端末に残ってしまうため。
  *   記録の控えは app.js が localStorage に 1 日分だけ持ち、ログアウトで消す。
  */
-const CACHE_NAME = "emocha-pwa-v19"; // 2026-10-14 v7: app.js・vendor を分けた / v8: 横長バナー / v9: 数字のアイコンを SVG に / v10: EmoChatLive バナー・下のタブも SVG
+const CACHE_NAME = "emocha-pwa-v20"; // 2026-10-14 v7: app.js・vendor を分けた / v8: 横長バナー / v9: 数字のアイコンを SVG に / v10: EmoChatLive バナー・下のタブも SVG
 const APP_SHELL = ["./", "./index.html", "./app.js", "./vendor/supabase.js", "./manifest.webmanifest", "./WEBアプリアイコン.png", "./banner.webp"];
 
 self.addEventListener("install", (event) => {
@@ -36,7 +36,8 @@ self.addEventListener("fetch", (event) => {
   if (new URL(request.url).origin !== self.location.origin) return; // 他のサイト（Supabase・配信者のアイコン等）は控えない
 
   event.respondWith(
-    fetch(request)
+    // 通信中に、公開先が少しの間だけ返している古いファイルを控え直さない（2026-10-19）
+    fetch(request, { cache: "no-store" })
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
