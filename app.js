@@ -65,6 +65,11 @@ const { createClient } = window.supabase;
   const TIER_GOAL = { gold: Infinity, silver: 30, bronze: 7, none: 3 };
   const AVATAR_COLORS = ["#ff7a18", "#8b5cff", "#3f8cff", "#ff3f81", "#26b57a", "#e0a52c", "#4d6bff", "#c2447a"];
   const HEATMAP_DAYS = 90;
+  const LOG_DAILY_PAGE = 14;
+  const LOG_SIGNED_OUT = "ログインすると、あなたの記録が見られます。";
+  // 未ログイン・ログアウト後は false（4 枚のカードは数字を出さず案内文）。ログインして取り込み始めたら true
+  let statsSignedIn = false;
+  let logDailyShown = LOG_DAILY_PAGE;
 
   
   // ============================================================
@@ -2441,6 +2446,7 @@ const { createClient } = window.supabase;
   // ============================================================
   function renderLog() {
     renderHeatmap();
+    renderLogKinds();
   }
 
   // ---- 推し活ヒートマップ（直近 90 日。GitHub の草グラフと同じ、日曜始まり・週が列のレイアウト） ----
@@ -2486,9 +2492,11 @@ const { createClient } = window.supabase;
       .join("");
 
     grid.querySelectorAll(".heatmap-cell:not(.is-empty)").forEach((cell) => {
-      const show = () => showHeatmapDetail(cell.dataset);
-      cell.addEventListener("click", show);
-      cell.addEventListener("mouseenter", show);
+      cell.addEventListener("click", () => {
+        showHeatmapDetail(cell.dataset);
+        focusLogDay(cell.dataset.date);
+      });
+      cell.addEventListener("mouseenter", () => showHeatmapDetail(cell.dataset));
     });
 
     const latest = [...cells].reverse().find(Boolean); // 一番新しい日を初期表示にする
@@ -2502,6 +2510,279 @@ const { createClient } = window.supabase;
     document.querySelectorAll(".heatmap-cell.is-selected").forEach((el) => el.classList.remove("is-selected"));
     const target = document.querySelector(`.heatmap-cell[data-date="${date}"]`);
     if (target) target.classList.add("is-selected");
+  }
+
+  // 取り込んだ日別（新しい日が先）。日付の形が違う行は出さない
+  function activityNewestFirst() {
+    return (DUMMY.activity ?? [])
+      .filter((row) => typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }
+
+  function formatLogDate(date) {
+    return `${date.slice(0, 4)}年${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+  }
+
+  function formatYearMonth(ym) {
+    return `${Number(ym.slice(0, 4))}年${Number(ym.slice(5, 7))}月`;
+  }
+
+  // 2026-01 の前は 2025-12（月の index が負になっても Date が年を繰り下げる）
+  function previousMonthKey(ym) {
+    const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function formatDelta(diff, kind) {
+    if (diff === 0) return "±0";
+    const sign = diff > 0 ? "＋" : "−";
+    const abs = Math.abs(diff);
+    if (kind === "watch") return `${sign}${formatWatchDuration(abs)}`;
+    if (kind === "points") return `${sign}${formatCount(abs)} pt`;
+    return `${sign}${formatCount(abs)}`;
+  }
+
+  function sumActivity(rows) {
+    return rows.reduce((acc, row) => ({
+      watchMs: acc.watchMs + row.watchMs,
+      commentCount: acc.commentCount + row.commentCount,
+      feverCount: acc.feverCount + row.feverCount,
+      channelPoints: acc.channelPoints + row.channelPoints,
+    }), { watchMs: 0, commentCount: 0, feverCount: 0, channelPoints: 0 });
+  }
+
+  // 同じ値なら日付が新しい方。0 以下は記録にしない
+  function bestBy(rows, key) {
+    let best = null;
+    for (const row of rows) {
+      const value = row[key];
+      if (!(value > 0)) continue;
+      if (!best || value > best[key] || (value === best[key] && row.date > best.date)) best = row;
+    }
+    return best;
+  }
+
+  function logText(tag, className, text) {
+    const el = document.createElement(tag);
+    el.className = className;
+    el.textContent = text;
+    return el;
+  }
+
+  function logLine(className, text, field) {
+    const el = logText("p", className, text);
+    if (field) el.dataset.field = field;
+    return el;
+  }
+
+  function renderLogDaily() {
+    const list = document.getElementById("logDailyList");
+    const more = document.getElementById("logDailyMore");
+    list.replaceChildren();
+    if (!statsSignedIn) {
+      more.hidden = true;
+      list.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = activityNewestFirst();
+    if (!rows.length) {
+      more.hidden = true;
+      list.append(logText("p", "points-empty", "まだ日ごとの記録がありません。"));
+      return;
+    }
+    const statsOf = (cls, text) => logText("span", `log-day-stat ${cls}`, text);
+    for (const row of rows.slice(0, logDailyShown)) {
+      const item = document.createElement("div");
+      item.className = "log-day";
+      item.dataset.date = row.date;
+      const stats = document.createElement("div");
+      stats.className = "log-day-stats";
+      stats.append(
+        statsOf("log-day-watch", `視聴 ${formatWatchDuration(row.watchMs)}`),
+        statsOf("log-day-comments", `コメント ${formatCount(row.commentCount)}`),
+        statsOf("log-day-fever", `激熱 ${formatCount(row.feverCount)}回`),
+        statsOf("log-day-points", `ポイント ${formatCount(row.channelPoints)} pt`),
+      );
+      item.append(logText("div", "log-day-date", formatLogDate(row.date)), stats);
+      list.append(item);
+    }
+    more.hidden = logDailyShown >= rows.length;
+  }
+
+  function monthTotals(which, ym, rows) {
+    const box = document.createElement("div");
+    box.className = "log-month";
+    box.dataset.month = ym;
+    box.append(logText("h4", "log-month-title", `${which}（${formatYearMonth(ym)}）`));
+    const sum = sumActivity(rows);
+    const best = bestBy(rows, "watchMs");
+    const bestLine = logLine("log-month-line", "", "best");
+    if (best) {
+      bestLine.append(
+        document.createTextNode("いちばん長く見た日: "),
+        logText("span", "log-keep", `${formatLogDate(best.date)}（${formatWatchDuration(best.watchMs)}）`),
+      );
+    } else {
+      bestLine.textContent = "いちばん長く見た日: まだありません";
+    }
+    box.append(
+      logLine("log-month-line", `視聴時間 ${formatWatchDuration(sum.watchMs)}`, "watch"),
+      logLine("log-month-line", `コメント ${formatCount(sum.commentCount)}`, "comments"),
+      logLine("log-month-line", `激熱 ${formatCount(sum.feverCount)}回`, "fever"),
+      logLine("log-month-line", `ポイント ${formatCount(sum.channelPoints)} pt`, "points"),
+      bestLine,
+    );
+    return box;
+  }
+
+  function renderLogMonth() {
+    const body = document.getElementById("logMonthBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = activityNewestFirst();
+    const thisYm = localDateString(Date.now()).slice(0, 7);
+    const lastYm = previousMonthKey(thisYm);
+    const thisRows = rows.filter((row) => row.date.slice(0, 7) === thisYm);
+    const lastRows = rows.filter((row) => row.date.slice(0, 7) === lastYm);
+    body.append(monthTotals("今月", thisYm, thisRows));
+    if (!lastRows.length) {
+      const box = document.createElement("div");
+      box.className = "log-month";
+      box.dataset.month = lastYm;
+      box.append(
+        logText("h4", "log-month-title", `先月（${formatYearMonth(lastYm)}）`),
+        logText("p", "log-month-empty", "先月の記録はありません"),
+      );
+      body.append(box);
+      return;
+    }
+    body.append(monthTotals("先月", lastYm, lastRows));
+    const cur = sumActivity(thisRows);
+    const prev = sumActivity(lastRows);
+    const delta = document.createElement("div");
+    delta.className = "log-month-delta";
+    delta.append(
+      logLine("log-month-line", `視聴時間の差 ${formatDelta(cur.watchMs - prev.watchMs, "watch")}`, "delta-watch"),
+      logLine("log-month-line", `コメントの差 ${formatDelta(cur.commentCount - prev.commentCount, "count")}`, "delta-comments"),
+      logLine("log-month-line", `激熱の差 ${formatDelta(cur.feverCount - prev.feverCount, "count")}`, "delta-fever"),
+      logLine("log-month-line", `ポイントの差 ${formatDelta(cur.channelPoints - prev.channelPoints, "points")}`, "delta-points"),
+    );
+    body.append(delta);
+  }
+
+  // チャンネルの表に「最後に見た日」は無い（first_watch_at は最初に見た日、updated_at は行の更新時刻）。
+  //   その項目は出さない。並びはホームの一覧と同じ、視聴時間が長い順
+  function renderLogChannels() {
+    const list = document.getElementById("logChannelList");
+    list.replaceChildren();
+    if (!statsSignedIn) {
+      const li = document.createElement("li");
+      li.className = "points-empty log-signed-out";
+      li.textContent = LOG_SIGNED_OUT;
+      list.append(li);
+      return;
+    }
+    const channels = [...DUMMY.channels].sort((a, b) => b.watchMs - a.watchMs || String(a.name).localeCompare(String(b.name), "ja"));
+    if (!channels.length) {
+      const li = document.createElement("li");
+      li.className = "points-empty";
+      li.textContent = "まだチャンネルの記録がありません。";
+      list.append(li);
+      return;
+    }
+    channels.forEach((ch, i) => {
+      const row = document.createElement("li");
+      row.className = "points-channel-row is-link log-channel-row";
+      const text = document.createElement("span");
+      text.className = "log-channel-text";
+      const name = document.createElement("span");
+      name.className = "points-channel-name";
+      name.textContent = ch.name; // 配信者名は外部由来なので textContent（innerHTML に入れない）
+      const meta = document.createElement("span");
+      meta.className = "log-channel-meta";
+      meta.append(
+        logText("span", "log-keep", `視聴 ${formatWatchDuration(ch.watchMs)}`),
+        document.createTextNode("・"),
+        logText("span", "log-keep", `コメント ${formatCount(ch.comments)}`),
+        document.createTextNode("・"),
+        logText("span", "log-keep", `激熱 ${formatCount(ch.fever)}回`),
+      );
+      text.append(name, meta);
+      row.append(channelAvatarEl(ch, i, "points-channel-avatar"), text);
+      row.addEventListener("click", () => openChannel(ch, i));
+      list.append(row);
+    });
+  }
+
+  function renderLogRecords() {
+    const body = document.getElementById("logRecordBody");
+    body.replaceChildren();
+    if (!statsSignedIn) {
+      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
+      return;
+    }
+    const rows = activityNewestFirst();
+    const watchBest = bestBy(rows, "watchMs");
+    const commentBest = bestBy(rows, "commentCount");
+    const feverBest = bestBy(rows, "feverCount");
+    const specs = [
+      ["watch", "1日の最長視聴時間", watchBest ? `${formatWatchDuration(watchBest.watchMs)}（${formatLogDate(watchBest.date)}）` : ""],
+      ["comments", "1日の最多コメント", commentBest ? `${formatCount(commentBest.commentCount)}（${formatLogDate(commentBest.date)}）` : ""],
+      ["fever", "1日の最多激熱", feverBest ? `${formatCount(feverBest.feverCount)}回（${formatLogDate(feverBest.date)}）` : ""],
+    ];
+    for (const [kind, label, value] of specs) {
+      const line = document.createElement("p");
+      line.className = "log-record";
+      line.dataset.kind = kind;
+      if (value) {
+        line.append(document.createTextNode(`${label}: `), logText("span", "log-keep", value));
+      } else {
+        line.textContent = `${label}: まだありません`;
+      }
+      body.append(line);
+    }
+    // 連続日数の自己ベストは、すでに computeStreak が longest を出している
+    const streak = logText("p", "log-record", `連続日数の自己ベスト: ${formatCount(DUMMY.streak.longest)}日`);
+    streak.dataset.kind = "streak";
+    body.append(streak);
+  }
+
+  function renderLogKinds() {
+    renderLogDaily();
+    renderLogMonth();
+    renderLogChannels();
+    renderLogRecords();
+  }
+
+  // ヒートマップのマスをタップした日が、見えている 14 日より古ければそこまで開いてから光らせる
+  function focusLogDay(date) {
+    if (!statsSignedIn || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const rows = activityNewestFirst();
+    const index = rows.findIndex((row) => row.date === date);
+    if (index < 0) return;
+    if (index >= logDailyShown) {
+      logDailyShown = Math.min(rows.length, Math.ceil((index + 1) / LOG_DAILY_PAGE) * LOG_DAILY_PAGE);
+      renderLogDaily();
+    }
+    const row = document.querySelector(`#logDailyList .log-day[data-date="${date}"]`);
+    if (!row) return;
+    document.querySelectorAll("#logDailyList .log-day.is-flash").forEach((el) => el.classList.remove("is-flash"));
+    if (typeof row.scrollIntoView === "function") {
+      try { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* テスト用の DOM では動かないことがある */ }
+    }
+    row.classList.remove("is-flash");
+    void row.offsetWidth;
+    row.classList.add("is-flash");
+  }
+
+  function setupLogKinds() {
+    document.getElementById("logDailyMore").addEventListener("click", () => {
+      logDailyShown += LOG_DAILY_PAGE;
+      renderLogDaily();
+    });
   }
 
   // ============================================================
@@ -2651,6 +2932,8 @@ const { createClient } = window.supabase;
   // ============================================================
   async function loadRealStats(user) {
     const gen = authGen; // 失敗した時も、ログイン状態が変わっていたら画面を触らない
+    statsSignedIn = true;
+    renderLogKinds();
     const statusEl = document.getElementById("homeSyncStatus");
     statusEl.hidden = false;
     statusEl.classList.remove("is-error");
@@ -2683,7 +2966,7 @@ const { createClient } = window.supabase;
       });
       if (!got) return; // 通信の間にログアウトした（画面は showLoggedOut が片付け済み）
       const { payload, at } = got;
-      applyStats(payload);
+      applyStats(payload, true);
       rerenderStats();
       loadTownData(user);
       // いつの記録かを出しておく（1 日 1 回の更新なので「反映が遅い」と思われないように）
@@ -2694,6 +2977,7 @@ const { createClient } = window.supabase;
       console.warn("[EmoChat] 実績データを取得できませんでした", err);
       if (gen !== authGen) return; // 通信の間にログアウト・別の人に替わった（画面はもう片付いている）
       if (showStaleStats(user, gen)) return; // 通信できない時は、最後の控えを日付つきで出す（2026-10-19）
+      renderLogKinds();
       statusEl.hidden = false;
       statusEl.classList.remove("is-loading");
       statusEl.classList.add("is-error");
@@ -2715,7 +2999,7 @@ const { createClient } = window.supabase;
   function showStaleStats(user, gen) {
     const last = readStoredSnapshot(user, "stats");
     if (!last) return false;
-    applyStats(last.payload);
+    applyStats(last.payload, true);
     rerenderStats();
     const statusEl = document.getElementById("homeSyncStatus");
     statusEl.hidden = false;
@@ -2732,7 +3016,9 @@ const { createClient } = window.supabase;
   }
 
   // 取れたデータ（または EMPTY_PAYLOAD）で画面用のデータを入れ替える
-  function applyStats(payload) {
+  function applyStats(payload, signedIn) {
+    statsSignedIn = !!signedIn;
+    logDailyShown = LOG_DAILY_PAGE;
     const [statsData, todayData, historyData, activityData, profileData] = payload;
 
     const totals = (statsData ?? []).reduce(
@@ -2821,6 +3107,7 @@ const { createClient } = window.supabase;
   function rerenderStats() {
     renderHome();
     renderSettingsProfile();
+    renderLogKinds(); // タブを開いていなくても、ログアウトで前の人の 4 枚が残らないようにする
     logDirty = true;
     const log = document.getElementById("view-log");
     const graph = document.getElementById("view-graph");
@@ -2830,7 +3117,7 @@ const { createClient } = window.supabase;
 
   // ログインしていない時の画面（開いた直後・ログアウト後）。数字は全部 0・一覧は空・ランキングは案内文
   function showLoggedOut() {
-    applyStats(EMPTY_PAYLOAD);
+    applyStats(EMPTY_PAYLOAD, false);
     rerenderStats();
     renderRanking();
     // チャンネルのページも片付ける（開いたまま別のタブでログアウトした時に、前の人の配信者名・数字が残らないように）
@@ -2849,6 +3136,7 @@ const { createClient } = window.supabase;
   setupGraph();
   setupViz();
   setupSolid();
+  setupLogKinds();
   showLoggedOut();
   renderSettings();
 })();

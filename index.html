@@ -2044,6 +2044,91 @@
     /* 白い紙の上ではラベンダー付箋が溶けるので、縁を少し濃く */
     #dashboard .emo-note { border-color: rgba(106, 91, 214, 0.55); }
 
+    /* ---------- ログ: 日別・月別・チャンネル別・記録（ヒートマップの下。2026-10-24） ---------- */
+    #view-log .card-section { min-width: 0; }
+    .log-day {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      max-width: 100%;
+      margin-bottom: 6px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      scroll-margin: 12px;
+    }
+    .log-day-date {
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .log-day-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
+      min-width: 0;
+    }
+    .log-day-stat {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+    .log-keep { white-space: nowrap; }
+    .log-day.is-flash { animation: log-day-flash 1.2s ease; }
+    @keyframes log-day-flash {
+      0%, 40% { box-shadow: inset 0 0 0 2px #d6338a; background: rgba(240, 83, 155, 0.28); }
+      100% { box-shadow: inset 0 0 0 2px transparent; }
+    }
+    .log-more {
+      width: 100%;
+      margin-top: 10px;
+      min-height: 44px;
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .log-month { min-width: 0; padding: 8px 0 2px; }
+    .log-month + .log-month,
+    .log-month-delta { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+    .log-month-title { margin: 0 0 6px; font-size: 13px; font-weight: 800; }
+    .log-month-line,
+    .log-record,
+    .log-month-empty {
+      margin: 0 0 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .log-record { display: flex; flex-wrap: wrap; }
+    .log-channel-row { min-width: 0; }
+    .log-channel-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-channel-row .points-channel-name { flex: none; max-width: 100%; }
+    .log-channel-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 2px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      line-height: 1.45;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .log-day.is-flash { animation: none; box-shadow: inset 0 0 0 2px #d6338a; }
+    }
+
     /* 日別の棒を太くする時、はみ出した分は横に送る（2026-10-19） */
     .graph-scroll {
       overflow-x: auto;
@@ -2276,6 +2361,35 @@
             <div class="heatmap-detail-row" id="heatmapDetailWatch"></div>
             <div class="heatmap-detail-row" id="heatmapDetailFever"></div>
           </div>
+        </div>
+
+        <div class="card card-section" id="logDailyCard">
+          <div class="card-section-head">
+            <h3>📅 日ごとの履歴</h3>
+          </div>
+          <div id="logDailyList"></div>
+          <button type="button" class="log-more" id="logDailyMore" hidden>もっと見る</button>
+        </div>
+
+        <div class="card card-section" id="logMonthCard">
+          <div class="card-section-head">
+            <h3>🗓️ 月ごとのまとめ</h3>
+          </div>
+          <div id="logMonthBody"></div>
+        </div>
+
+        <div class="card card-section" id="logChannelCard">
+          <div class="card-section-head">
+            <h3>📺 チャンネル別ログ</h3>
+          </div>
+          <ul class="points-channel-list" id="logChannelList"></ul>
+        </div>
+
+        <div class="card card-section" id="logRecordCard">
+          <div class="card-section-head">
+            <h3>🏅 記録・ベスト</h3>
+          </div>
+          <div id="logRecordBody"></div>
         </div>
       </section>
 
