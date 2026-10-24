@@ -427,6 +427,17 @@
       gap: 6px;
     }
 
+    /* ログの折りたたみ（2026-10-24 案 A。高さを 0fr → 1fr で動かす） */
+    .log-fold .card-section-head.log-fold-head { cursor: pointer; margin-bottom: 0; min-height: 28px; -webkit-tap-highlight-color: transparent; }
+    .log-fold .card-section-head.log-fold-head:focus-visible { outline: 2px solid #7c5ce6; outline-offset: 4px; border-radius: 8px; }
+    .log-fold-chev { width: 9px; height: 9px; border-right: 2.5px solid #7c5ce6; border-bottom: 2.5px solid #7c5ce6; transform: rotate(45deg); margin: 0 4px 4px 0; flex: none; transition: transform .3s; }
+    .log-fold.is-open .log-fold-chev { transform: rotate(-135deg); margin: 4px 4px 0 0; }
+    .log-fold-body { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows .35s cubic-bezier(.3, .8, .3, 1), visibility 0s .35s; }
+    .log-fold-inner { overflow: hidden; min-height: 0; opacity: 0; padding-top: 0; transition: opacity .25s, padding-top .35s; }
+    .log-fold.is-open .log-fold-body { grid-template-rows: 1fr; visibility: visible; transition-delay: 0s, 0s; }
+    .log-fold.is-open .log-fold-inner { opacity: 1; padding-top: 12px; transition-delay: .08s, 0s; }
+    @media (prefers-reduced-motion: reduce) { .log-fold-chev, .log-fold-body, .log-fold-inner { transition: none; } }
+
     .tier-badge {
       font-size: 11px;
       font-weight: 800;

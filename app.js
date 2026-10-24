@@ -3151,6 +3151,45 @@ const { createClient } = window.supabase;
     renderLogCheer();
   }
 
+  // ログのカードを折りたたみにする（最初は閉じている。ヒートマップのカードは開いたまま。2026-10-24）
+  //   見出しを押すと、高さがなめらかに広がる。中身の要素は移すだけなので、ID も描く関数もそのまま
+  const LOG_FOLD_CARDS = ["logDailyCard", "logMonthCard", "logChannelCard", "logRecordCard", "logWeekdayCard", "logWeekCard", "logFeverTopCard", "logMilestoneCard", "logHistoryCard", "logCheerCard"];
+  function setLogFold(card, open) {
+    if (!card) return;
+    card.classList.toggle("is-open", open);
+    card.querySelector(".log-fold-head")?.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function setupLogFolds() {
+    LOG_FOLD_CARDS.forEach((id, i) => {
+      const card = document.getElementById(id);
+      const head = card?.querySelector(".card-section-head");
+      if (!card || !head || card.classList.contains("log-fold")) return;
+      const body = document.createElement("div");
+      body.className = "log-fold-body";
+      body.id = `${id}Fold`;
+      const inner = document.createElement("div");
+      inner.className = "log-fold-inner";
+      while (head.nextSibling) inner.appendChild(head.nextSibling);
+      body.appendChild(inner);
+      head.after(body);
+      head.classList.add("log-fold-head");
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      head.setAttribute("aria-controls", body.id);
+      const chev = document.createElement("i");
+      chev.className = "log-fold-chev";
+      chev.setAttribute("aria-hidden", "true");
+      head.appendChild(chev);
+      card.classList.add("log-fold");
+      setLogFold(card, false);
+      const toggle = () => setLogFold(card, !card.classList.contains("is-open"));
+      head.addEventListener("click", toggle);
+      head.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
   // ヒートマップのマスをタップした日が、見えている 14 日より古ければそこまで開いてから光らせる
   function focusLogDay(date) {
     if (!statsSignedIn || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
@@ -3161,6 +3200,7 @@ const { createClient } = window.supabase;
       logDailyShown = Math.min(rows.length, Math.ceil((index + 1) / LOG_DAILY_PAGE) * LOG_DAILY_PAGE);
       renderLogDaily();
     }
+    setLogFold(document.getElementById("logDailyCard"), true); // 閉じていたら開いてから光らせる
     const row = document.querySelector(`#logDailyList .log-day[data-date="${date}"]`);
     if (!row) return;
     document.querySelectorAll("#logDailyList .log-day.is-flash").forEach((el) => el.classList.remove("is-flash"));
@@ -3532,6 +3572,7 @@ const { createClient } = window.supabase;
   setupViz();
   setupSolid();
   setupLogKinds();
+  setupLogFolds();
   showLoggedOut();
   renderSettings();
 })();
