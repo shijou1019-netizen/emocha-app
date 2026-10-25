@@ -2366,6 +2366,18 @@ const { createClient } = window.supabase;
   // 寄せ書きを出す配信者の数（視聴時間の多い順。2026-10-14 依頼者決定: 上位だけにして呼び出しを減らす）
   const BOARD_CHANNELS = 5;
 
+  // 順位バッジ: 肉球の中に順位の数字（1 位 金・2 位 銀・3 位 銅・4 位以降 薄い紫。2026-10-26 依頼者: まっすぐのぷっくり塗り）
+  const RANK_PAW_COLORS = { 1: ["#ffe08a", "#f2a93b", "#4a3200"], 2: ["#e4e6ef", "#aeb3c4", "#2f3345"], 3: ["#efbb82", "#c07a3e", "#3a2100"], 0: ["#efeaff", "#c5b8f2", "#3b2f8a"] };
+  const RANK_PAW_TOES = "M1.93 10.07A1.8 2.5 -22 1 0 5.27 8.73A1.8 2.5 -22 1 0 1.93 10.07zM6.32 4.96A1.9 2.6 -8 1 0 10.08 4.44A1.9 2.6 -8 1 0 6.32 4.96zM13.92 4.44A1.9 2.6 8 1 0 17.68 4.96A1.9 2.6 8 1 0 13.92 4.44zM18.73 8.73A1.8 2.5 22 1 0 22.07 10.07A1.8 2.5 22 1 0 18.73 8.73z";
+  const RANK_PAW_PAD = "M12 9.2c-4.6 0-8.6 4.2-8.6 8.4 0 2.7 2 4.2 4.3 4.2 1.4 0 2.6-.8 4.3-.8s2.9.8 4.3.8c2.3 0 4.3-1.5 4.3-4.2 0-4.2-4-8.4-8.6-8.4z";
+  function rankPawSvg(place, idx) {
+    const [a, b, ink] = RANK_PAW_COLORS[place >= 1 && place <= 3 ? place : 0];
+    const len = String(place).length;
+    const size = len >= 3 ? 7 : len === 2 ? 9 : 11;
+    const y = size === 11 ? 19.1 : size === 9 ? 18.7 : 18.3;
+    return `<svg viewBox="0 0 24 24" width="40" height="40" role="img" aria-label="${place}位"><defs><linearGradient id="rp${idx}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><path d="${RANK_PAW_TOES}${RANK_PAW_PAD}" fill="url(#rp${idx})"/><text x="12" y="${y}" text-anchor="middle" font-size="${size}" font-weight="800" font-family="system-ui,sans-serif" fill="${ink}">${place}</text></svg>`;
+  }
+
   function paintTown(payload) {
     const crowns = { 1: window.EmoIcons.iconSvg("crown"), 2: window.EmoIcons.iconSvg("silver"), 3: window.EmoIcons.iconSvg("bronze") };
     const rows = payload?.rows ?? [];
@@ -2379,7 +2391,7 @@ const { createClient } = window.supabase;
       const name = r.out_display_name || "（名前なし）";
       return `
         <li class="ranking-row${r.out_is_me ? " is-me" : ""}" data-place="${place <= 3 ? place : ""}">
-          <span class="rank-badge">${place}</span>
+          <span class="rank-badge">${rankPawSvg(place, i)}</span>
           <span class="rank-avatar" style="background:${colorFor(i)}">${esc(initialOf(name))}</span>
           <div class="rank-info">
             <div class="rank-name">

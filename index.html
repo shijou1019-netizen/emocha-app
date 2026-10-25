@@ -2349,6 +2349,16 @@
         height: 28px;
       }
     }
+
+    /* 順位バッジは肉球の SVG（丸い背景・色は SVG の中。2026-10-26 依頼者） */
+    .ranking-row .rank-badge,
+    .ranking-row[data-place] .rank-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 0;
+      background: none;
+    }
+    .rank-badge svg { display: block; }
   </style>
 </head>
 
