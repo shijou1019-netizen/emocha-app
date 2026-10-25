@@ -2332,7 +2332,7 @@
 
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>🔥 継続日数（ストリーク）</h3>
+            <h3><span data-icon="fire"></span> 継続日数（ストリーク）</h3>
             <span class="tier-badge" id="tierBadge"></span>
           </div>
           <div class="streak-row">
@@ -2345,7 +2345,7 @@
 
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>🎁 獲得ポイント実績</h3>
+            <h3><span data-icon="gift"></span> 獲得ポイント実績</h3>
           </div>
           <div class="points-total">
             <span class="points-total-value" id="pointsTotal">0</span>
@@ -2370,13 +2370,13 @@
         <!-- チャンネルごとの記録（押すとそのチャンネルのページへ。2026-10-14 依頼者: 称号の枠をやめ、チャンネルごとのページに） -->
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>📺 チャンネルごとの記録</h3>
+            <h3><span data-icon="tv"></span> チャンネルごとの記録</h3>
           </div>
           <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">押すと、そのチャンネルの記録とインデックスが見られます。</p>
           <ul class="points-channel-list" id="channelList"></ul>
         </div>
 
-        <h2 class="view-title" style="margin-top:28px">⚙️ 設定</h2>
+        <h2 class="view-title" style="margin-top:28px"><span data-icon="gear"></span> 設定</h2>
 
         <div class="card settings-block">
           <div id="authLoggedOut">
@@ -2445,7 +2445,7 @@
 
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>🎖️ インデックス</h3>
+            <h3><span data-icon="medal"></span> インデックス</h3>
           </div>
           <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">このチャンネルでの記録で決まる 5 種類の印です。段が上がると絵が替わります。</p>
           <ul class="idx-list" id="indexList"></ul>
@@ -2454,21 +2454,21 @@
 
       <!-- 👑 ランキング -->
       <section class="view" id="view-ranking" data-view="ranking" hidden>
-        <h2 class="view-title">👑 ランキング</h2>
+        <h2 class="view-title"><span data-icon="crown"></span> ランキング</h2>
         <p class="view-subtitle" id="rankingSubtitle"></p>
         <ul class="ranking-list" id="rankingList"></ul>
-        <h3 class="view-title" style="margin-top:24px">🖼️ 今月の寄せ書き</h3>
+        <h3 class="view-title" style="margin-top:24px"><span data-icon="frame"></span> 今月の寄せ書き</h3>
         <p class="view-subtitle">推しの街ごとの、今月の進み具合です（見るだけ）。</p>
         <ul class="ranking-list" id="boardList"></ul>
       </section>
 
       <!-- 📊 ログ -->
       <section class="view" id="view-log" data-view="log" hidden>
-        <h2 class="view-title">📊 ログ</h2>
+        <h2 class="view-title"><span data-icon="bars"></span> ログ</h2>
 
         <div class="card card-section">
           <div class="card-section-head">
-            <h3>🌻 直近90日の推し活ヒートマップ</h3>
+            <h3><span data-icon="sunflower"></span> 直近90日の推し活ヒートマップ</h3>
           </div>
           <div class="heatmap-wrap">
             <div class="heatmap-grid" id="heatmapGrid"></div>
@@ -2490,7 +2490,7 @@
 
         <div class="card card-section" id="logDailyCard">
           <div class="card-section-head">
-            <h3>📅 日ごとの履歴</h3>
+            <h3><span data-icon="calendar"></span> 日ごとの履歴</h3>
           </div>
           <div id="logDailyList"></div>
           <button type="button" class="log-more" id="logDailyMore" hidden>もっと見る</button>
@@ -2498,21 +2498,21 @@
 
         <div class="card card-section" id="logMonthCard">
           <div class="card-section-head">
-            <h3>🗓️ 月ごとのまとめ</h3>
+            <h3><span data-icon="calmonth"></span> 月ごとのまとめ</h3>
           </div>
           <div id="logMonthBody"></div>
         </div>
 
         <div class="card card-section" id="logChannelCard">
           <div class="card-section-head">
-            <h3>📺 チャンネル別ログ</h3>
+            <h3><span data-icon="tv"></span> チャンネル別ログ</h3>
           </div>
           <ul class="points-channel-list" id="logChannelList"></ul>
         </div>
 
         <div class="card card-section" id="logRecordCard">
           <div class="card-section-head">
-            <h3>🏅 記録・ベスト</h3>
+            <h3><span data-icon="medal"></span> 記録・ベスト</h3>
           </div>
           <div id="logRecordBody"></div>
         </div>
@@ -2520,7 +2520,7 @@
         <!-- ログ: 曜日 -->
         <div class="card card-section" id="logWeekdayCard">
           <div class="card-section-head">
-            <h3>📆 曜日ごとの傾向</h3>
+            <h3><span data-icon="weekday"></span> 曜日ごとの傾向</h3>
           </div>
           <div id="logWeekdayBody"></div>
         </div>
@@ -2529,7 +2529,7 @@
         <!-- ログ: 週 -->
         <div class="card card-section" id="logWeekCard">
           <div class="card-section-head">
-            <h3>🗞️ 週ごとのまとめ</h3>
+            <h3><span data-icon="news"></span> 週ごとのまとめ</h3>
           </div>
           <div id="logWeekBody"></div>
         </div>
@@ -2538,7 +2538,7 @@
         <!-- ログ: 激熱TOP -->
         <div class="card card-section" id="logFeverTopCard">
           <div class="card-section-head">
-            <h3>🔥 激熱の多かった日 TOP5</h3>
+            <h3><span data-icon="fire"></span> 激熱の多かった日 TOP5</h3>
           </div>
           <div id="logFeverTopBody"></div>
         </div>
@@ -2547,7 +2547,7 @@
         <!-- ログ: マイルストーン -->
         <div class="card card-section" id="logMilestoneCard">
           <div class="card-section-head">
-            <h3>🎯 マイルストーン</h3>
+            <h3><span data-icon="target"></span> マイルストーン</h3>
           </div>
           <div id="logMilestoneBody"></div>
         </div>
@@ -2556,7 +2556,7 @@
         <!-- ログ: 推し歴 -->
         <div class="card card-section" id="logHistoryCard">
           <div class="card-section-head">
-            <h3>🌱 推し歴の年表</h3>
+            <h3><span data-icon="sprout"></span> 推し歴の年表</h3>
           </div>
           <div id="logHistoryBody"></div>
         </div>
@@ -2565,7 +2565,7 @@
         <!-- ログ: 応援 -->
         <div class="card card-section" id="logCheerCard">
           <div class="card-section-head">
-            <h3>💝 応援の記録</h3>
+            <h3><span data-icon="heart"></span> 応援の記録</h3>
           </div>
           <div id="logCheerBody"></div>
         </div>
@@ -2574,11 +2574,11 @@
 
       <!-- 📈 グラフ -->
       <section class="view" id="view-graph" data-view="graph" hidden>
-        <h2 class="view-title">📈 グラフ</h2>
+        <h2 class="view-title"><span data-icon="trend"></span> グラフ</h2>
 
         <div class="card card-section" id="graphCard">
           <div class="card-section-head">
-            <h3>📈 推し活グラフ</h3>
+            <h3><span data-icon="trend"></span> 推し活グラフ</h3>
           </div>
           <div class="seg" id="graphMetric" role="tablist" aria-label="見る項目">
             <button type="button" class="seg-btn is-active" data-value="points">ポイント</button>
@@ -2608,7 +2608,7 @@
 
         <div class="card card-section" id="breakdownCard">
           <div class="card-section-head">
-            <h3>🧭 チャンネル別の内訳</h3>
+            <h3><span data-icon="compass"></span> チャンネル別の内訳</h3>
           </div>
           <div class="seg seg-sm seg-scroll" id="bdMetric" role="tablist" aria-label="見る項目">
             <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
@@ -2628,7 +2628,7 @@
       
         <div class="card card-section" id="ledgerCard">
           <div class="card-section-head">
-            <h3>⚖️ ポイントの収支</h3>
+            <h3><span data-icon="scale"></span> ポイントの収支</h3>
           </div>
           <div class="points-split">
             <div class="points-split-item">
@@ -2646,7 +2646,7 @@
 
         <div class="card card-section" id="tenureCard">
           <div class="card-section-head">
-            <h3>🌱 推し歴と年表</h3>
+            <h3><span data-icon="sprout"></span> 推し歴と年表</h3>
           </div>
           <div class="bd-list" id="tenureList"></div>
           <h4 class="points-channel-title">推しを増やした年表</h4>
@@ -2655,26 +2655,26 @@
 
         <div class="card card-section" id="vizCard">
           <div class="card-section-head">
-            <h3>🎨 いろいろなグラフ</h3>
+            <h3><span data-icon="palette"></span> いろいろなグラフ</h3>
           </div>
           <div class="seg seg-wrap" id="vizType" role="tablist" aria-label="グラフの種類">
-            <button type="button" class="seg-btn is-active" data-value="honey">🍯 ハニカム</button>
-            <button type="button" class="seg-btn" data-value="rose">🌸 花びら</button>
-            <button type="button" class="seg-btn" data-value="tree">🧱 ブロック</button>
-            <button type="button" class="seg-btn" data-value="bubble">🫧 バブル</button>
-            <button type="button" class="seg-btn" data-value="growth">🌱 成長</button>
-            <button type="button" class="seg-btn" data-value="radar">🕸️ レーダー</button>
-            <button type="button" class="seg-btn" data-value="rings">🎯 達成度</button>
-            <button type="button" class="seg-btn" data-value="year">🪵 年輪</button>
-            <button type="button" class="seg-btn" data-value="stream">🌊 ストリーム</button>
-            <button type="button" class="seg-btn" data-value="sankey">🔀 ポイントの流れ</button>
-            <button type="button" class="seg-btn" data-value="multi">📊 ミニ推移</button>
-            <button type="button" class="seg-btn" data-value="waffle">🧇 ワッフル</button>
-            <button type="button" class="seg-btn" data-value="ridge">🏔 山脈</button>
-            <button type="button" class="seg-btn" data-value="sunburst">☀️ サンバースト</button>
-            <button type="button" class="seg-btn" data-value="punch">🔵 ドット</button>
-            <button type="button" class="seg-btn" data-value="dumbbell">🏋️ ダンベル</button>
-            <button type="button" class="seg-btn" data-value="hist">🔔 ふだんの1日</button>
+            <button type="button" class="seg-btn is-active" data-value="honey"><span data-icon="honey"></span> ハニカム</button>
+            <button type="button" class="seg-btn" data-value="rose"><span data-icon="petal"></span> 花びら</button>
+            <button type="button" class="seg-btn" data-value="tree"><span data-icon="blocks"></span> ブロック</button>
+            <button type="button" class="seg-btn" data-value="bubble"><span data-icon="bubble"></span> バブル</button>
+            <button type="button" class="seg-btn" data-value="growth"><span data-icon="sprout"></span> 成長</button>
+            <button type="button" class="seg-btn" data-value="radar"><span data-icon="radar"></span> レーダー</button>
+            <button type="button" class="seg-btn" data-value="rings"><span data-icon="target"></span> 達成度</button>
+            <button type="button" class="seg-btn" data-value="year"><span data-icon="rings"></span> 年輪</button>
+            <button type="button" class="seg-btn" data-value="stream"><span data-icon="wave"></span> ストリーム</button>
+            <button type="button" class="seg-btn" data-value="sankey"><span data-icon="flow"></span> ポイントの流れ</button>
+            <button type="button" class="seg-btn" data-value="multi"><span data-icon="minibars"></span> ミニ推移</button>
+            <button type="button" class="seg-btn" data-value="waffle"><span data-icon="waffle"></span> ワッフル</button>
+            <button type="button" class="seg-btn" data-value="ridge"><span data-icon="ridge"></span> 山脈</button>
+            <button type="button" class="seg-btn" data-value="sunburst"><span data-icon="sun"></span> サンバースト</button>
+            <button type="button" class="seg-btn" data-value="punch"><span data-icon="dots"></span> ドット</button>
+            <button type="button" class="seg-btn" data-value="dumbbell"><span data-icon="dumbbell"></span> ダンベル</button>
+            <button type="button" class="seg-btn" data-value="hist"><span data-icon="hist"></span> ふだんの1日</button>
           </div>
           <div class="seg seg-sm" id="vizMetric" role="tablist" aria-label="見る項目">
             <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
@@ -2689,19 +2689,19 @@
       
         <div class="card card-section solid-stage" id="solidCard">
           <header class="solid-head">
-            <h3>🧊 立体グラフ</h3>
+            <h3><span data-icon="cube"></span> 立体グラフ</h3>
             <p>直近の推し活を、立体で眺める</p>
           </header>
 
           <div class="solid-controls">
             <div class="seg solid-seg solid-seg-grid" id="solidType" role="tablist" aria-label="グラフの種類">
-              <button type="button" class="seg-btn is-active" data-value="city">🏙️ 街</button>
-              <button type="button" class="seg-btn" data-value="hex">🍯 ハニカム</button>
-              <button type="button" class="seg-btn" data-value="ring">🎡 リング</button>
-              <button type="button" class="seg-btn" data-value="tower">🗼 タワー</button>
-              <button type="button" class="seg-btn" data-value="helix">🌀 らせん</button>
-              <button type="button" class="seg-btn" data-value="stack">📚 積み上げ</button>
-              <button type="button" class="seg-btn" data-value="group">🧩 グループ</button>
+              <button type="button" class="seg-btn is-active" data-value="city"><span data-icon="city"></span> 街</button>
+              <button type="button" class="seg-btn" data-value="hex"><span data-icon="honey"></span> ハニカム</button>
+              <button type="button" class="seg-btn" data-value="ring"><span data-icon="ring"></span> リング</button>
+              <button type="button" class="seg-btn" data-value="tower"><span data-icon="tower"></span> タワー</button>
+              <button type="button" class="seg-btn" data-value="helix"><span data-icon="helix"></span> らせん</button>
+              <button type="button" class="seg-btn" data-value="stack"><span data-icon="stack"></span> 積み上げ</button>
+              <button type="button" class="seg-btn" data-value="group"><span data-icon="group"></span> グループ</button>
             </div>
             <div class="seg solid-seg solid-seg-sm solid-seg-grid" id="solidLook" role="tablist" aria-label="見た目">
               <button type="button" class="seg-btn is-active" data-value="solid">ソリッド</button>
@@ -2732,9 +2732,9 @@
           <div class="solid-controls">
             <div class="seg solid-seg solid-metrics" id="solidMetric" role="tablist" aria-label="見る項目">
               <button type="button" class="seg-btn is-active" data-value="watch">⏱ 視聴時間</button>
-              <button type="button" class="seg-btn" data-value="comments">💬 コメント</button>
-              <button type="button" class="seg-btn" data-value="fever">🔥 激熱</button>
-              <button type="button" class="seg-btn" data-value="points">⭐ ポイント</button>
+              <button type="button" class="seg-btn" data-value="comments"><span data-icon="chat"></span> コメント</button>
+              <button type="button" class="seg-btn" data-value="fever"><span data-icon="fire"></span> 激熱</button>
+              <button type="button" class="seg-btn" data-value="points"><span data-icon="star"></span> ポイント</button>
             </div>
           </div>
           <p class="solid-hint" id="solidNote"></p>
@@ -2782,6 +2782,7 @@
   </div>
 
   <script src="./vendor/supabase.js"></script>
+  <script src="./icons.js"></script>
   <script src="./app.js"></script>
 
 </body>

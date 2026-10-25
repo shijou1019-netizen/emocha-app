@@ -238,6 +238,9 @@ const { createClient } = window.supabase;
     btn.addEventListener("click", () => activateTab(btn.dataset.tab));
   });
 
+  // 見出し・ボタンの絵文字だった所（<span data-icon="…">）を SVG アイコンに置き換える（icons.js。2026-10-25 依頼者）
+  window.EmoIcons.hydrateIcons();
+
   // ============================================================
   // ホームの 3 つの数字のアイコン（SVG。絵文字をやめ、青→紫→ピンクのグラデーションのデフォルメした形に。2026-10-14 依頼者）
   //   自前の固定の文字列なので innerHTML に入れてよい。グラデーションの id は 3 つで別にする（同じ画面に並ぶため）
@@ -2364,7 +2367,7 @@ const { createClient } = window.supabase;
   const BOARD_CHANNELS = 5;
 
   function paintTown(payload) {
-    const crowns = { 1: "👑", 2: "🥈", 3: "🥉" };
+    const crowns = { 1: window.EmoIcons.iconSvg("crown"), 2: window.EmoIcons.iconSvg("silver"), 3: window.EmoIcons.iconSvg("bronze") };
     const rows = payload?.rows ?? [];
     const me = payload?.me ?? null;
     const boards = payload?.boards ?? [];
@@ -2565,7 +2568,7 @@ const { createClient } = window.supabase;
   function logText(tag, className, text) {
     const el = document.createElement(tag);
     el.className = className;
-    el.textContent = text;
+    window.EmoIcons.setIconText(el, text); // 絵文字は SVG アイコンにする（2026-10-25）
     return el;
   }
 
