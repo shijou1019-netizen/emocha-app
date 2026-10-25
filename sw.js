@@ -11,7 +11,7 @@
  *   Supabase からの応答（自分の視聴記録）は控えない。控えると、ログアウトしても端末に残ってしまうため。
  *   記録の控えは app.js が localStorage に 1 日分だけ持ち、ログアウトで消す。
  */
-const CACHE_NAME = "emocha-pwa-v26"; // 2026-10-24 v22: ログに曜日・週・激熱TOP・マイルストーン・推し歴・応援（v21 から 1 つ上げた）
+const CACHE_NAME = "emocha-pwa-v27"; // 2026-10-24 v22: ログに曜日・週・激熱TOP・マイルストーン・推し歴・応援（v21 から 1 つ上げた）
 const APP_SHELL = ["./", "./index.html", "./app.js", "./icons.js", "./vendor/supabase.js", "./manifest.webmanifest", "./WEBアプリアイコン.png", "./banner.webp"];
 
 self.addEventListener("install", (event) => {

@@ -1856,10 +1856,13 @@
 
     .timeline-item::before { background: linear-gradient(135deg, #ff8cc6, #8b5cf6); }
 
-    /* ヒートマップ: すみれ → ピンク → 光るピンク */
-    .heatmap-cell[data-level="1"] { background: rgba(139, 92, 246, 0.45); }
-    .heatmap-cell[data-level="2"] { background: #c06ce6; }
-    .heatmap-cell[data-level="3"] { background: #ff8cc6; box-shadow: 0 0 6px rgba(255, 140, 198, 0.8); }
+    /* ヒートマップ: すみれ → ピンク → 光るピンク（0 = 記録なし ＋ 6 段。2026-10-25 依頼者: 4 段階から 7 段階に） */
+    .heatmap-cell[data-level="1"] { background: rgba(139, 92, 246, 0.28); }
+    .heatmap-cell[data-level="2"] { background: rgba(139, 92, 246, 0.55); }
+    .heatmap-cell[data-level="3"] { background: #a863ea; }
+    .heatmap-cell[data-level="4"] { background: #c06ce6; }
+    .heatmap-cell[data-level="5"] { background: #ff8cc6; box-shadow: 0 0 6px rgba(255, 140, 198, 0.8); }
+    .heatmap-cell[data-level="6"] { background: #ff4fa5; box-shadow: 0 0 9px rgba(255, 79, 165, 0.95); }
 
     .viz-svg .v-label-on { fill: #1d1238; }
 
@@ -2479,6 +2482,9 @@
             <span class="heatmap-cell" data-level="1"></span>
             <span class="heatmap-cell" data-level="2"></span>
             <span class="heatmap-cell" data-level="3"></span>
+            <span class="heatmap-cell" data-level="4"></span>
+            <span class="heatmap-cell" data-level="5"></span>
+            <span class="heatmap-cell" data-level="6"></span>
             <span>多い</span>
           </div>
           <div class="heatmap-detail emo-note">

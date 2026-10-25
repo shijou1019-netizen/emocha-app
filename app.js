@@ -2457,10 +2457,8 @@ const { createClient } = window.supabase;
   //   ここでは「1 週目の頭を日曜に揃えるための空マス → 90 日ぶんのマス」を順番に並べるだけでよい
   function heatmapLevel(watchMs, maxWatchMs) {
     if (watchMs <= 0 || maxWatchMs <= 0) return 0;
-    const ratio = watchMs / maxWatchMs;
-    if (ratio > 0.66) return 3;
-    if (ratio > 0.33) return 2;
-    return 1;
+    // 一番多い日を 6 に、記録のある日を 1〜6 の 6 段に等分する（2026-10-25 依頼者: 7 段階 = 記録なし + 6 段）
+    return Math.min(6, Math.max(1, Math.ceil((watchMs / maxWatchMs) * 6)));
   }
 
   function renderHeatmap() {
