@@ -3525,52 +3525,6 @@ const { createClient } = window.supabase;
   }
   // /ログ: マイルストーン
 
-  // ログ: 推し歴
-  function logHistoryAgo(thenMs, nowMs) {
-    const then = new Date(thenMs);
-    const now = new Date(nowMs);
-    let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth());
-    if (now.getDate() < then.getDate()) months -= 1;
-    if (months < 0) months = 0;
-    const years = Math.floor(months / 12);
-    const rest = months % 12;
-    return `${years}年${rest}か月前`;
-  }
-
-  function renderLogHistory() {
-    const body = document.getElementById("logHistoryBody");
-    body.replaceChildren();
-    if (!statsSignedIn) {
-      body.append(logText("p", "points-empty log-signed-out", LOG_SIGNED_OUT));
-      return;
-    }
-    const rows = DUMMY.channels
-      .filter((ch) => ch.firstWatchAt > 0)
-      .sort((a, b) => a.firstWatchAt - b.firstWatchAt || String(a.name).localeCompare(String(b.name), "ja"));
-    if (!rows.length) {
-      body.append(logText("p", "points-empty", "まだ推し歴の記録はありません"));
-      return;
-    }
-    const list = document.createElement("ul");
-    list.className = "points-channel-list";
-    const now = Date.now();
-    for (const ch of rows) {
-      const item = document.createElement("li");
-      item.className = "log-history-row";
-      item.dataset.channel = ch.id;
-      const name = document.createElement("span");
-      name.className = "log-history-name";
-      name.textContent = ch.name;
-      const when = document.createElement("span");
-      when.className = "log-history-when";
-      when.textContent = `${formatLogDate(localDateString(ch.firstWatchAt))}（${logHistoryAgo(ch.firstWatchAt, now)}）`;
-      item.append(name, when);
-      list.append(item);
-    }
-    body.append(list);
-  }
-  // /ログ: 推し歴
-
   // ログ: 応援
   function renderLogCheer() {
     const body = document.getElementById("logCheerBody");
@@ -3620,13 +3574,12 @@ const { createClient } = window.supabase;
     renderLogWeek();
     renderLogFeverTop();
     renderLogMilestone();
-    renderLogHistory();
     renderLogCheer();
   }
 
   // ログのカードを折りたたみにする（最初は閉じている。ヒートマップのカードは開いたまま。2026-10-24）
   //   見出しを押すと、高さがなめらかに広がる。中身の要素は移すだけなので、ID も描く関数もそのまま
-  const LOG_FOLD_CARDS = ["logDailyCard", "logMonthCard", "logChannelCard", "logRecordCard", "logWeekdayCard", "logWeekCard", "logFeverTopCard", "logMilestoneCard", "logHistoryCard", "logCheerCard"];
+  const LOG_FOLD_CARDS = ["logDailyCard", "logMonthCard", "logChannelCard", "logRecordCard", "logWeekdayCard", "logWeekCard", "logFeverTopCard", "logMilestoneCard", "tenureCard", "logCheerCard", "ledgerCard"];
   function setLogFold(card, open) {
     if (!card) return;
     card.classList.toggle("is-open", open);
