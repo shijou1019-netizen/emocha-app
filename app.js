@@ -39,7 +39,7 @@ const { createClient } = window.supabase;
     achievements: {
       totalWatchMinutes: 0, // 累計視聴時間
       totalComments: 0, // コメント送信数
-      hotMomentCount: 0, // 激熱の経験回数
+      hotMomentCount: 0, // 激熱経験回数
     },
     today: null, // { watchMs, commentCount, feverCount }（user_daily_activity。ログインして取れるまでは非表示）
     dailyHistory: [], // [{ date, watchMs, feverCount }]（ヒートマップ用。直近90日）
@@ -274,7 +274,7 @@ const { createClient } = window.supabase;
     const stats = [
       { icon: STAT_ICONS.watch, value: formatMinutes(DUMMY.achievements.totalWatchMinutes), label: "累計視聴時間" },
       { icon: STAT_ICONS.comments, value: formatCount(DUMMY.achievements.totalComments), label: "コメント送信数" },
-      { icon: STAT_ICONS.fever, value: `${formatCount(DUMMY.achievements.hotMomentCount)} 回`, label: "激熱の経験回数" },
+      { icon: STAT_ICONS.fever, value: `${formatCount(DUMMY.achievements.hotMomentCount)} 回`, label: "激熱経験回数" },
     ];
     statGrid.innerHTML = stats
       .map(
@@ -2205,7 +2205,7 @@ const { createClient } = window.supabase;
     const stats = [
       { icon: STAT_ICONS_CH.watch, value: formatWatchDuration(ch.watchMs), label: `視聴時間（ライブ ${formatWatchDuration(ch.liveWatchMs)}）` },
       { icon: STAT_ICONS_CH.comments, value: formatCount(ch.comments), label: "コメント送信数" },
-      { icon: STAT_ICONS_CH.fever, value: `${formatCount(ch.fever)} 回`, label: "激熱の経験回数" },
+      { icon: STAT_ICONS_CH.fever, value: `${formatCount(ch.fever)} 回`, label: "激熱経験回数" },
     ];
     document.getElementById("channelStats").innerHTML = stats.map((s, k) => `
       <div class="card stat-card${k === 0 ? " span-2" : ""}">
