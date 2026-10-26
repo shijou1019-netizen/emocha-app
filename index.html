@@ -2002,6 +2002,13 @@
 
     .emo-note:empty { display: none; }
 
+    /* 「〜するには？」の折りたたみ案内（チャンネルごとの記録の上） */
+    .howto { margin: 0 0 12px; border: 1px solid rgba(124, 108, 220, 0.32); border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.7); }
+    .howto summary { padding: 12px 14px; font-size: 16px; font-weight: 800; color: #3b2f8a; cursor: pointer; }
+    .howto-body { padding: 0 14px 12px; font-size: 15px; line-height: 1.7; color: var(--text); }
+    .howto-body p { margin: 0 0 8px; }
+    .howto-body ol { margin: 0 0 8px; padding-left: 22px; }
+
     /* 案内（使い方の説明）は、頭に紫の丸い「？」 */
     .emo-note--help {
       padding-left: 46px;
@@ -2438,6 +2445,19 @@
             <h3><span data-icon="tv"></span> チャンネルごとの記録</h3>
           </div>
           <p class="points-total-label emo-note emo-note--help" style="margin:0 0 12px;">押すと、そのチャンネルの記録とインデックスが見られます。</p>
+          <details class="howto">
+            <summary>チャンネルを非表示・削除するには？</summary>
+            <div class="howto-body">
+              <p>非表示・削除は、パソコンの拡張機能（えもちゃっとライブ）でできます。このスマホ版は見るだけです。</p>
+              <ol>
+                <li>拡張機能の「実績」の画面を開く</li>
+                <li>ランキングの中の、消したいチャンネルを押す</li>
+                <li>開いたカードの下にあるボタンを押す</li>
+              </ol>
+              <p><b>ランキングから非表示にする</b>: 一覧から外れますが、記録は残ります。ランキングの下の「非表示にしたチャンネル」から、いつでも「表示に戻す」ができます。</p>
+              <p><b>削除する</b>: そのチャンネルの記録ごと消えます。元には戻せません。押すと確認が出るので、もう一度押すと消えます（4 秒以内に押さないと取り消し）。</p>
+            </div>
+          </details>
           <ul class="points-channel-list" id="channelList"></ul>
         </div>
 
