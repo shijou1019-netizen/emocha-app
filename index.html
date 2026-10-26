@@ -1167,8 +1167,8 @@
     .heatmap-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 4px;
-      margin-bottom: 12px;
+      padding: 4px; /* 選んだ四角の枠（外に 3px）が端で切れないように */
+      margin: -4px -4px 8px;
     }
 
     .heatmap-grid {
