@@ -1501,10 +1501,214 @@ const { createClient } = window.supabase;
     return "直近180日の「1日の量」の分布。棒が高いあたりが、ふだんの1日です（左端は活動のなかった日）。";
   }
 
+  // ---------- 新しい見せ方（2026-10-27 追加）: バーコード・散布図・心電図・星座・月カレンダー・メーター・らせん ----------
+  const VIZ_RAMP = [[63, 42, 120], [192, 108, 230], [255, 140, 198]]; // 少ない = 濃いすみれ → 多い = ピンク
+  function vizRamp(t) {
+    const x = Math.max(0, Math.min(1, t)) * 2;
+    const i = Math.min(1, Math.floor(x));
+    const f = x - i;
+    const a = VIZ_RAMP[i], b = VIZ_RAMP[i + 1];
+    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",")})`;
+  }
+
+  // 直近 n 日（古い順）の { date, value, row }
+  function vizDays(n, metric) {
+    const byDate = new Map(DUMMY.activity.map((r) => [r.date, r]));
+    return Array.from({ length: n }, (_, k) => {
+      const date = localDateString(Date.now() - (n - 1 - k) * 86_400_000);
+      const row = byDate.get(date);
+      return { date, row, value: row ? vizDayValue(row, metric) : 0 };
+    });
+  }
+
+  const vizShortDate = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+
+  // バーコード: 直近 100 日を 1 日 1 本の縦じまに。濃い日ほど多かった日
+  function drawBarcode(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const days = vizDays(100, metric);
+    const max = Math.max(...days.map((d) => d.value), 0);
+    if (max <= 0) return "まだデータがありません。";
+    days.forEach((d, i) => {
+      const bar = svgEl("rect", {
+        class: "v-shape", x: 10 + i * 3.1, y: 30, width: 3.1, height: 150,
+        fill: d.value > 0 ? vizRamp(0.25 + 0.75 * (d.value / max)) : "rgba(128,128,160,0.16)",
+      });
+      bar.addEventListener("click", () => vizPick(bar, `${vizShortDate(d.date)}: ${graphFormat(metric, d.value)}`));
+      svg.append(bar);
+    });
+    vizLabel(svg, vizShortDate(days[0].date), { x: 10, y: 198 });
+    vizLabel(svg, "今日", { x: 310, y: 198, "text-anchor": "end" });
+    return "1 日 1 本のバーコード。濃いピンクの日が、たくさん過ごした日です。";
+  }
+
+  // 散布図: 1 日を 1 つの点に。右ほど長く見た日・上ほどコメントが多い日・大きい点は激熱が多かった日
+  function drawScatter(svg) {
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const days = vizDays(90, "watch").filter((d) => d.row && (d.row.watchMs > 0 || d.row.commentCount > 0));
+    if (!days.length) return "まだデータがありません。";
+    const maxW = Math.max(...days.map((d) => d.row.watchMs), 1);
+    const maxC = Math.max(...days.map((d) => d.row.commentCount), 1);
+    const L = 34, R = 304, T = 18, B = 196;
+    svg.append(svgEl("path", { d: `M${L} ${T}V${B}H${R}`, fill: "none", stroke: "rgba(128,128,160,0.5)", "stroke-width": 1.2 }));
+    vizLabel(svg, "コメントが多い ↑", { x: L + 4, y: T + 8 });
+    vizLabel(svg, "長く見た →", { x: R, y: B + 16, "text-anchor": "end" });
+    days.forEach((d) => {
+      const cx = L + 8 + (d.row.watchMs / maxW) * (R - L - 16);
+      const cy = B - 8 - (d.row.commentCount / maxC) * (B - T - 16);
+      const dot = svgEl("circle", {
+        class: "v-shape", cx, cy, r: Math.min(10, 3.5 + d.row.feverCount * 1.4),
+        fill: "#ff8cc6", "fill-opacity": 0.7,
+      });
+      dot.addEventListener("click", () => vizPick(dot, `${vizShortDate(d.date)}: 視聴 ${formatWatchDuration(d.row.watchMs)}・コメント ${d.row.commentCount} 件・激熱 ${d.row.feverCount} 回`));
+      svg.append(dot);
+    });
+    return "1 日が 1 つの点。右上に行くほど「長く見て、たくさん書いた日」、大きい点は激熱が多かった日です。";
+  }
+
+  // 心電図: 直近 28 日を、ドキドキの波形に。多い日ほど大きく跳ねる
+  function drawEcg(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const days = vizDays(28, metric);
+    const max = Math.max(...days.map((d) => d.value), 0);
+    if (max <= 0) return "まだデータがありません。";
+    const y0 = 140, w = 10.4, x0 = 12;
+    let path = `M${x0} ${y0}`;
+    days.forEach((d, i) => {
+      const x = x0 + i * w;
+      const h = (d.value / max) * 105;
+      path += `L${x + 1.5} ${y0}L${x + 3} ${y0 - h * 0.15}L${x + 4.4} ${y0 + h * 0.28}L${x + 5.8} ${y0 - h}L${x + 7.4} ${y0 + h * 0.22}L${x + 8.8} ${y0}L${x + w} ${y0}`;
+    });
+    svg.append(svgEl("path", { d: path, fill: "none", stroke: "rgba(255,140,198,0.3)", "stroke-width": 6, "stroke-linejoin": "round" }));
+    svg.append(svgEl("path", { d: path, fill: "none", stroke: "#e0408f", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    days.forEach((d, i) => {
+      const hit = svgEl("rect", { class: "v-shape", x: x0 + i * w, y: 20, width: w, height: 200, fill: "transparent" });
+      hit.addEventListener("click", () => vizPick(hit, `${vizShortDate(d.date)}: ${graphFormat(metric, d.value)}`));
+      svg.append(hit);
+      if (i % 7 === 0) vizLabel(svg, vizShortDate(d.date), { x: x0 + i * w, y: 232 });
+    });
+    return "毎日の記録を心臓の鼓動のように。大きく跳ねた日が、よく過ごした日です。";
+  }
+
+  // 星座: 直近 30 日を星にして、日の順に線でつなぐ。明るく大きい星が多かった日
+  function drawConstellation(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const days = vizDays(30, metric);
+    const max = Math.max(...days.map((d) => d.value), 0);
+    if (max <= 0) return "まだデータがありません。";
+    svg.append(svgEl("rect", { x: 0, y: 0, width: 320, height: 250, rx: 16, fill: "#241f4d" }));
+    for (let k = 0; k < 40; k++) { // 背景の小さな星（毎回同じ並び）
+      svg.append(svgEl("circle", { cx: (k * 97) % 316 + 2, cy: (k * 53) % 240 + 4, r: k % 3 ? 0.7 : 1.1, fill: "rgba(255,255,255,0.35)" }));
+    }
+    const pts = days.map((d, i) => ({ d, x: 18 + i * ((320 - 36) / 29), y: 205 - Math.sqrt(d.value / max) * 150 }));
+    svg.append(svgEl("polyline", { points: pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "), fill: "none", stroke: "rgba(196,166,255,0.6)", "stroke-width": 1.1 }));
+    pts.forEach((p) => {
+      const t = p.d.value / max;
+      svg.append(svgEl("circle", { cx: p.x, cy: p.y, r: 2 + t * 7, fill: "rgba(255,207,107,0.22)" }));
+      const star = svgEl("circle", { class: "v-shape", cx: p.x, cy: p.y, r: 1.6 + t * 3.6, fill: t > 0 ? "#ffe9a8" : "rgba(255,255,255,0.4)" });
+      star.addEventListener("click", () => vizPick(star, `${vizShortDate(p.d.date)}: ${graphFormat(metric, p.d.value)}`));
+      svg.append(star);
+    });
+    return "毎日が 1 つの星。高く明るい星が、たくさん過ごした日です。星をつないで自分だけの星座にしました。";
+  }
+
+  // 月カレンダー: 今月のカレンダーに、多い日ほど大きい丸を置く
+  function drawMonthCal(svg) {
+    const { metric } = vizState;
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const first = new Date(y, m, 1).getDay();
+    const dim = new Date(y, m + 1, 0).getDate();
+    const rows = Math.ceil((first + dim) / 7);
+    svg.setAttribute("viewBox", `0 0 320 ${44 + rows * 40}`);
+    const byDate = new Map(DUMMY.activity.map((r) => [r.date, r]));
+    const key = (d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const vals = Array.from({ length: dim }, (_, i) => { const r = byDate.get(key(i + 1)); return r ? vizDayValue(r, metric) : 0; });
+    const max = Math.max(...vals, 0);
+    "日月火水木金土".split("").forEach((w, i) => vizLabel(svg, w, { x: 20 + i * 46.7, y: 16, "text-anchor": "middle" }));
+    vals.forEach((v, i) => {
+      const slot = first + i;
+      const cx = 20 + (slot % 7) * 46.7, cy = 40 + Math.floor(slot / 7) * 40;
+      vizLabel(svg, String(i + 1), { x: cx - 17, y: cy - 10, class: "v-label v-label-sub" });
+      const r = v > 0 && max > 0 ? 4 + Math.sqrt(v / max) * 14 : 2.5;
+      const dot = svgEl("circle", { class: "v-shape", cx, cy: cy + 3, r, fill: v > 0 ? vizRamp(0.3 + 0.7 * (v / max)) : "rgba(128,128,160,0.25)" });
+      dot.addEventListener("click", () => vizPick(dot, `${m + 1}/${i + 1}: ${graphFormat(metric, v)}`));
+      svg.append(dot);
+    });
+    return max > 0 ? `${m + 1}月のカレンダー。丸が大きい日ほど、たくさん過ごした日です。` : "今月はまだ記録がありません。";
+  }
+
+  // メーター: 今月がここまでで、先月の同じ日までと比べてどのくらいか
+  function drawMeter(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const now = new Date();
+    const day = now.getDate();
+    const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const cur = ym(now), prev = ym(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    let a = 0, b = 0;
+    for (const r of DUMMY.activity) {
+      const dd = Number(r.date.slice(8, 10));
+      if (r.date.startsWith(cur) && dd <= day) a += vizDayValue(r, metric);
+      else if (r.date.startsWith(prev) && dd <= day) b += vizDayValue(r, metric);
+    }
+    const cx = 160, cy = 170, R = 110;
+    const arc = (from, to, color, w) => {
+      const p = (t) => [cx + R * Math.cos(Math.PI * (1 - t)), cy - R * Math.sin(Math.PI * (1 - t))];
+      const [x1, y1] = p(from), [x2, y2] = p(to);
+      svg.append(svgEl("path", { d: `M${x1} ${y1}A${R} ${R} 0 0 1 ${x2} ${y2}`, fill: "none", stroke: color, "stroke-width": w, "stroke-linecap": "round" }));
+    };
+    arc(0, 1, "rgba(128,128,160,0.22)", 22);
+    if (b <= 0) {
+      vizLabel(svg, graphFormat(metric, a), { class: "v-label v-label-big", x: cx, y: cy - 20, "text-anchor": "middle" });
+      vizLabel(svg, "今月ここまで", { x: cx, y: cy, "text-anchor": "middle" });
+      return "先月の同じ日までの記録がないので、比べられません。";
+    }
+    const ratio = a / b;
+    const t = Math.min(1, ratio / 2); // 左端 0% ・ 真ん中 100%（先月と同じ）・ 右端 200% 以上
+    if (t > 0.01) arc(0, t, vizRamp(0.3 + 0.7 * t), 22);
+    const ang = Math.PI * (1 - t);
+    svg.append(svgEl("line", { x1: cx, y1: cy, x2: cx + (R - 30) * Math.cos(ang), y2: cy - (R - 30) * Math.sin(ang), stroke: "#2a2454", "stroke-width": 3, "stroke-linecap": "round" }));
+    svg.append(svgEl("circle", { cx, cy, r: 6, fill: "#2a2454" }));
+    svg.append(svgEl("line", { x1: cx, y1: cy - R - 16, x2: cx, y2: cy - R + 16, stroke: "#5a5390", "stroke-width": 1.5 }));
+    vizLabel(svg, "先月と同じ", { x: cx, y: cy - R - 22, "text-anchor": "middle" });
+    vizLabel(svg, "0%", { x: cx - R, y: cy + 20, "text-anchor": "middle" });
+    vizLabel(svg, "200%", { x: cx + R, y: cy + 20, "text-anchor": "middle" });
+    vizLabel(svg, `${Math.round(ratio * 100)}%`, { class: "v-label v-label-big", x: cx, y: cy + 38, "text-anchor": "middle" });
+    vizLabel(svg, `今月 ${graphFormat(metric, a)}`, { class: "v-label v-label-day", x: cx, y: cy + 62, "text-anchor": "middle" });
+    vizLabel(svg, `先月 ${graphFormat(metric, b)}`, { x: cx, y: cy + 78, "text-anchor": "middle" });
+    return `${now.getMonth() + 1}月${day}日までを、先月の同じ日までと比べました。真ん中より右なら、先月より多いです。`;
+  }
+
+  // らせん: 直近 90 日を、1 周 30 日のうずまきに並べる。外側が最近。大きく濃い点が多かった日
+  function drawSpiral(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 270");
+    const days = vizDays(90, metric);
+    const max = Math.max(...days.map((d) => d.value), 0);
+    if (max <= 0) return "まだデータがありません。";
+    days.forEach((d, i) => {
+      const th = (i / 30) * Math.PI * 2 - Math.PI / 2;
+      const r = 18 + i * 1.1;
+      const dot = svgEl("circle", {
+        class: "v-shape", cx: 160 + r * Math.cos(th), cy: 135 + r * Math.sin(th),
+        r: d.value > 0 ? 2.2 + Math.sqrt(d.value / max) * 5.5 : 1.8,
+        fill: d.value > 0 ? vizRamp(0.3 + 0.7 * (d.value / max)) : "rgba(128,128,160,0.35)",
+      });
+      if (i === days.length - 1) dot.classList.add("is-today");
+      dot.addEventListener("click", () => vizPick(dot, `${vizShortDate(d.date)}: ${graphFormat(metric, d.value)}`));
+      svg.append(dot);
+    });
+    return "中心が 90 日前、外側が今日。ぐるっと 1 周が 30 日です。大きくて濃い点が、たくさん過ごした日です。";
+  }
+
   function renderViz() {
     const { type } = vizState;
     // 項目が決まっている図（バブル・達成リング・ストリーム・ポイントの流れ・ミニ推移・サンバースト）は、項目の切り替えを出さない
-    document.getElementById("vizMetric").hidden = ["bubble", "rings", "stream", "sankey", "multi", "sunburst"].includes(type);
+    document.getElementById("vizMetric").hidden = ["bubble", "rings", "stream", "sankey", "multi", "sunburst", "scatter"].includes(type);
     const svg = document.getElementById("vizSvg");
     svg.replaceChildren();
     vizSel = null;
@@ -1513,6 +1717,7 @@ const { createClient } = window.supabase;
       honey: drawHoney, rose: drawRose, tree: drawTree, bubble: drawBubble, growth: drawGrowth, radar: drawRadar,
       rings: drawRings, year: drawYear, stream: drawStream, sankey: drawSankey, multi: drawMulti,
       waffle: drawWaffle, ridge: drawRidge, sunburst: drawSunburst, punch: drawPunch, dumbbell: drawDumbbell, hist: drawHist,
+      barcode: drawBarcode, scatter: drawScatter, ecg: drawEcg, constellation: drawConstellation, monthcal: drawMonthCal, meter: drawMeter, spiral: drawSpiral,
     }[type];
     document.getElementById("vizNote").textContent = draw(svg);
   }
@@ -1877,6 +2082,117 @@ const { createClient } = window.supabase;
     };
   }
 
+  // ---------- 新しい立体グラフ（2026-10-27 追加）: 曜日・ピラミッド・島・わっか・ウォール ----------
+  // 曜日: 月〜日の平均を 7 本の丸い柱に（平均は、記録のある日だけで出す）
+  function solidWeekday(metric) {
+    const sums = Array(7).fill(0), counts = Array(7).fill(0);
+    for (const row of DUMMY.activity) {
+      const [y, m, d] = row.date.split("-").map(Number);
+      const wd = (new Date(y, m - 1, d).getDay() + 6) % 7; // 月曜始まり
+      sums[wd] += vizDayValue(row, metric);
+      counts[wd]++;
+    }
+    const avgs = sums.map((s, i) => (counts[i] ? s / counts[i] : 0));
+    const max = Math.max(...avgs, 0);
+    const names = ["月", "火", "水", "木", "金", "土", "日"];
+    const items = avgs.map((v, i) => ({
+      x: (i - 3) * 1.55, z: 0, n: 10, r: 0.62, off: 0,
+      h: max > 0 ? 0.2 + (v / max) * 6 : 0.2,
+      color: hslToRgb(190 + i * 25, 0.72, 0.64),
+      label: names[i],
+      text: `${names[i]}曜日の平均: ${graphFormat(metric, v)}`,
+    }));
+    return { items, floor: [[-5.6, -1.6], [5.6, -1.6], [5.6, 1.6], [-5.6, 1.6]], scale: 25, cy: 192, labels: true, note: "曜日ごとの平均の柱。柱が高い曜日ほど、よく過ごす曜日です。ドラッグで回せます。" };
+  }
+
+  // ピラミッド: 上位 7 チャンネルを大きい順に下から積む。段が広いほど、たくさんあるチャンネル
+  function solidPyramid(metric) {
+    const list = DUMMY.channels
+      .map((c) => ({ name: c.name, value: vizChannelValue(c, metric) }))
+      .filter((c) => c.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7);
+    const max = list.length ? list[0].value : 0;
+    const items = list.map((c, i) => ({
+      x: 0, z: 0, n: 4, r: (0.6 + Math.sqrt(c.value / max) * 2.5) * Math.SQRT2, off: Math.PI / 4,
+      y0: i * 0.92, h: 0.86,
+      color: i === 0 ? [255, 214, 150] : hslToRgb(200 + ((i - 1) / 6) * 140, 0.72, 0.64),
+      text: `${i + 1} 位 ${c.name}: ${graphFormat(metric, c.value)}`,
+    }));
+    return { items, floor: [[-3.6, -3.6], [3.6, -3.6], [3.6, 3.6], [-3.6, 3.6]], scale: 26, cy: 200, labels: false, note: list.length ? "チャンネルのピラミッド（上位 7 件）。一番下が 1 位で、段が広いほど多いです。段をタップで名前が見られます。" : "まだデータがありません。" };
+  }
+
+  // 島: 上位 10 チャンネルを、丸い島（円柱）に。大きく高い島ほど多い。1 位が真ん中
+  function solidIslands(metric) {
+    const list = DUMMY.channels
+      .map((c) => ({ name: c.name, value: vizChannelValue(c, metric) }))
+      .filter((c) => c.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+    const max = list.length ? list[0].value : 0;
+    const items = list.map((c, i) => {
+      const ring = i === 0 ? 0 : i <= 6 ? 3.5 : 5.8;
+      const a = i === 0 ? 0 : i <= 6 ? ((i - 1) / 6) * Math.PI * 2 : ((i - 7) / 4) * Math.PI * 2 + 0.5;
+      const ratio = c.value / max;
+      return {
+        x: Math.cos(a) * ring, z: Math.sin(a) * ring, n: 22, r: 0.5 + Math.sqrt(ratio) * 1.05, off: 0,
+        h: 0.25 + ratio * 4.2,
+        color: i === 0 ? [255, 214, 150] : hslToRgb(190 + (i / 9) * 150, 0.7, 0.66),
+        text: `${c.name}: ${graphFormat(metric, c.value)}`,
+      };
+    });
+    const floor = Array.from({ length: 30 }, (_, k) => [Math.cos((k / 30) * Math.PI * 2) * 7.6, Math.sin((k / 30) * Math.PI * 2) * 7.6]);
+    return { items, floor, scale: 17, cy: 184, labels: false, note: list.length ? "チャンネルの島（上位 10 件）。大きく高い島ほど多く、1 位が真ん中です。島をタップで名前が見られます。" : "まだデータがありません。" };
+  }
+
+  // わっか: 直近 12 週を、内側（古い）から外側（今週）への同心円に。1 周が 1 週間で、柱が高い日ほど多かった日
+  function solidRadial(metric) {
+    const byDate = new Map(DUMMY.activity.map((r) => [r.date, r]));
+    const wdToday = (new Date().getDay() + 6) % 7;
+    const startMs = Date.now() - (11 * 7 + wdToday) * 86_400_000;
+    const cells = [];
+    for (let w = 0; w < 12; w++) {
+      for (let d = 0; d < 7; d++) {
+        const ms = startMs + (w * 7 + d) * 86_400_000;
+        if (ms > Date.now()) continue;
+        const date = localDateString(ms);
+        const row = byDate.get(date);
+        cells.push({ w, d, date, value: row ? vizDayValue(row, metric) : 0 });
+      }
+    }
+    const max = Math.max(...cells.map((c) => c.value), 0);
+    const items = cells.map((c) => {
+      const a = (c.d / 7) * Math.PI * 2 - Math.PI / 2;
+      const rad = 1.9 + c.w * 0.62;
+      const ratio = max > 0 ? c.value / max : 0;
+      return {
+        x: Math.cos(a) * rad, z: Math.sin(a) * rad, n: 4, r: 0.26 * Math.SQRT2, off: Math.PI / 4 + a,
+        h: 0.1 + ratio * 4, color: solidGold(ratio),
+        text: `${c.date}: ${graphFormat(metric, c.value)}`,
+      };
+    });
+    const floor = Array.from({ length: 36 }, (_, k) => [Math.cos((k / 36) * Math.PI * 2) * 9.6, Math.sin((k / 36) * Math.PI * 2) * 9.6]);
+    return { items, floor, scale: 15.5, cy: 186, labels: false, note: "直近12週のわっか。内側が古い週、外側が今週。1 周が 1 週間です。柱が高い日ほど多かった日です。ドラッグで回せます。" };
+  }
+
+  // ウォール: 直近 30 日の壁（手前）と、その前の 30 日の壁（奥）を並べて、日ごとに前後で見比べる
+  function solidWall(metric) {
+    const cells = solidDays(metric, 60);
+    const max = Math.max(...cells.map((c) => c.value), 0);
+    const items = cells.map((c, i) => {
+      const recent = i >= 30;
+      const k = i % 30;
+      const ratio = max > 0 ? c.value / max : 0;
+      return {
+        x: (k - 14.5) * 0.56, z: recent ? 1.1 : -1.1, n: 4, r: 0.25 * Math.SQRT2, off: Math.PI / 4,
+        h: 0.1 + ratio * 6,
+        color: recent ? solidGold(ratio) : solidMix([60, 60, 150], solidGold(ratio), 0.55),
+        text: `${c.date}: ${graphFormat(metric, c.value)}（${recent ? "直近 30 日" : "その前の 30 日"}）`,
+      };
+    });
+    return { items, floor: [[-8.6, -2.2], [8.6, -2.2], [8.6, 2.2], [-8.6, 2.2]], scale: 17.5, cy: 190, labels: false, note: "手前が直近 30 日、奥がその前の 30 日の壁。同じ位置どうしを見比べられます。ドラッグで回せます。" };
+  }
+
   // ---- 描画（今の角度で 1 コマ描く） ----
   function solidFrame() {
     const svg = document.getElementById("solidSvg");
@@ -1965,7 +2281,7 @@ const { createClient } = window.supabase;
 
   function renderSolid() {
     const { type, metric } = solidState;
-    solidScene = { city: solidCity, hex: solidHex, ring: solidRing, tower: solidTower, helix: solidHelix, stack: solidStack, group: solidGroup }[type](metric);
+    solidScene = { city: solidCity, hex: solidHex, ring: solidRing, tower: solidTower, helix: solidHelix, stack: solidStack, group: solidGroup, weekday: solidWeekday, pyramid: solidPyramid, islands: solidIslands, radial: solidRadial, wall: solidWall }[type](metric);
     const noMetric = type === "group"; // グループは 4 つの項目を同時に並べるので、項目の切り替えとサマリーは使わない
     document.getElementById("solidMetric").hidden = noMetric;
     document.querySelector(".solid-summary").hidden = noMetric;
