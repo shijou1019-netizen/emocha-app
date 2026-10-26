@@ -2603,21 +2603,33 @@ const { createClient } = window.supabase;
       list.append(logText("p", "points-empty", "まだ日ごとの記録がありません。"));
       return;
     }
-    const statsOf = (cls, text) => logText("span", `log-day-stat ${cls}`, text);
+    // 表の見出しは 1 回だけ。各日は数字だけで、0 は「–」（2026-10-27 依頼者が案 D を採用）
+    const head = document.createElement("div");
+    head.className = "log-day-head";
+    for (const t of ["日", "視聴", "コメ", "激熱", "pt"]) head.append(logText("span", "", t));
+    list.append(head);
+    const thisYear = new Date().getFullYear();
+    const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+    const shortDate = (date) => {
+      const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)), d = Number(date.slice(8, 10));
+      return y === thisYear ? `${m}/${d}(${WEEK[new Date(y, m - 1, d).getDay()]})` : `${y}/${m}/${d}`;
+    };
+    const cell = (cls, n, text) => logText("span", `log-day-stat ${cls}`, n > 0 ? text : "–");
     for (const row of rows.slice(0, logDailyShown)) {
       const item = document.createElement("div");
       item.className = "log-day";
       item.dataset.date = row.date;
-      const stats = document.createElement("div");
-      stats.className = "log-day-stats";
-      stats.append(
-        statsOf("log-day-watch", `視聴 ${formatWatchDuration(row.watchMs)}`),
-        statsOf("log-day-comments", `コメント ${formatCount(row.commentCount)}`),
-        statsOf("log-day-fever", `激熱 ${formatCount(row.feverCount)}回`),
-        ...(row.infernoCount > 0 ? [statsOf("log-day-inferno", `爆熱 ${formatCount(row.infernoCount)}回`)] : []),
-        statsOf("log-day-points", `ポイント ${formatCount(row.channelPoints)} pt`),
+      const quiet = !(row.watchMs > 0 || row.commentCount > 0 || row.feverCount > 0 || row.infernoCount > 0 || row.channelPoints > 0);
+      if (quiet) item.classList.add("is-quiet");
+      const fever = cell("log-day-fever", row.feverCount, formatCount(row.feverCount));
+      if (row.infernoCount > 0) fever.append(logText("small", "log-day-inferno", `爆熱${formatCount(row.infernoCount)}`));
+      item.append(
+        logText("div", "log-day-date", shortDate(row.date)),
+        cell("log-day-watch", row.watchMs, formatWatchDuration(row.watchMs)),
+        cell("log-day-comments", row.commentCount, formatCount(row.commentCount)),
+        fever,
+        cell("log-day-points", row.channelPoints, formatCount(row.channelPoints)),
       );
-      item.append(logText("div", "log-day-date", formatLogDate(row.date)), stats);
       list.append(item);
     }
     more.hidden = logDailyShown >= rows.length;

@@ -2105,34 +2105,41 @@
 
     /* ---------- ログ: 日別・月別・チャンネル別・記録（ヒートマップの下。2026-10-24） ---------- */
     #view-log .card-section { min-width: 0; }
+    .log-day-head,
     .log-day {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1.25fr 1.7fr 0.7fr 0.8fr 0.9fr;
       gap: 4px;
+      align-items: center;
       min-width: 0;
       max-width: 100%;
-      margin-bottom: 6px;
-      padding: 8px 10px;
-      border-radius: var(--radius-sm);
-      background: var(--surface-2);
+    }
+    .log-day-head {
+      padding: 4px 8px 8px;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-sub);
+      border-bottom: 2px solid var(--border);
+    }
+    .log-day-head span:not(:first-child),
+    .log-day-stat { text-align: right; }
+    .log-day {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
       scroll-margin: 12px;
     }
+    .log-day.is-quiet { opacity: 0.55; }
     .log-day-date {
-      font-size: 14.5px;
+      font-size: 15px;
       font-weight: 800;
     }
-    .log-day-stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2px 10px;
-      min-width: 0;
-    }
     .log-day-stat {
-      font-size: 13.5px;
+      font-size: 16px;
       font-weight: 700;
-      color: var(--text-sub);
+      color: var(--text);
       white-space: nowrap;
     }
+    .log-day-inferno { display: block; font-size: 11px; font-weight: 800; color: #d6338a; }
     .log-keep { white-space: nowrap; }
     .log-day.is-flash { animation: log-day-flash 1.2s ease; }
     @keyframes log-day-flash {
