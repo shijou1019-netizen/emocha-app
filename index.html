@@ -2184,24 +2184,6 @@
       line-height: 1.45;
     }
     .log-record { display: flex; flex-wrap: wrap; }
-    .log-channel-row { min-width: 0; }
-    .log-channel-text {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .log-channel-row .points-channel-name { flex: none; max-width: 100%; }
-    .log-channel-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0 2px;
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--text-sub);
-      line-height: 1.45;
-    }
     @media (prefers-reduced-motion: reduce) {
       .log-day.is-flash { animation: none; box-shadow: inset 0 0 0 2px #d6338a; }
     }
@@ -2570,11 +2552,23 @@
           <div id="logMonthBody"></div>
         </div>
 
-        <div class="card card-section" id="logChannelCard">
+        <div class="card card-section" id="breakdownCard">
           <div class="card-section-head">
-            <h3><span data-icon="tv"></span> チャンネル別ログ</h3>
+            <h3><span data-icon="compass"></span> チャンネル別の内訳</h3>
           </div>
-          <ul class="points-channel-list" id="logChannelList"></ul>
+          <div class="seg seg-sm seg-scroll" id="bdMetric" role="tablist" aria-label="見る項目">
+            <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
+            <button type="button" class="seg-btn" data-value="comments">コメント</button>
+            <button type="button" class="seg-btn" data-value="fever">激熱</button>
+            <button type="button" class="seg-btn" data-value="points">ポイント</button>
+            <button type="button" class="seg-btn" data-value="density">コメ密度</button>
+          </div>
+          <div class="bd-list" id="bdList"></div>
+          <h4 class="points-channel-title">ライブとアーカイブ（視聴時間の割合）</h4>
+          <div class="donut-row">
+            <svg class="donut-svg" id="liveDonut" viewBox="0 0 100 100" role="img" aria-label="ライブとアーカイブの視聴時間の割合"></svg>
+            <div class="donut-legend" id="liveDonutLegend"></div>
+          </div>
         </div>
 
         <div class="card card-section" id="logRecordCard">
@@ -2694,28 +2688,6 @@
           <div class="wk-chart" id="weekdayChart"></div>
           <p class="mini-note emo-note emo-note--help" id="graphNote"></p>
         </div>
-
-        <div class="card card-section" id="breakdownCard">
-          <div class="card-section-head">
-            <h3><span data-icon="compass"></span> チャンネル別の内訳</h3>
-          </div>
-          <div class="seg seg-sm seg-scroll" id="bdMetric" role="tablist" aria-label="見る項目">
-            <button type="button" class="seg-btn is-active" data-value="watch">視聴時間</button>
-            <button type="button" class="seg-btn" data-value="comments">コメント</button>
-            <button type="button" class="seg-btn" data-value="fever">激熱</button>
-            <button type="button" class="seg-btn" data-value="points">ポイント</button>
-            <button type="button" class="seg-btn" data-value="density">コメ密度</button>
-          </div>
-          <div class="bd-list" id="bdList"></div>
-          <h4 class="points-channel-title">ライブとアーカイブ（視聴時間の割合）</h4>
-          <div class="donut-row">
-            <svg class="donut-svg" id="liveDonut" viewBox="0 0 100 100" role="img" aria-label="ライブとアーカイブの視聴時間の割合"></svg>
-            <div class="donut-legend" id="liveDonutLegend"></div>
-          </div>
-        </div>
-
-      
-
 
         <div class="card card-section" id="vizCard">
           <div class="card-section-head">

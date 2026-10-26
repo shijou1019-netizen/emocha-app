@@ -3129,50 +3129,6 @@ const { createClient } = window.supabase;
     body.append(delta);
   }
 
-  // チャンネルの表に「最後に見た日」は無い（first_watch_at は最初に見た日、updated_at は行の更新時刻）。
-  //   その項目は出さない。並びはホームの一覧と同じ、視聴時間が長い順
-  function renderLogChannels() {
-    const list = document.getElementById("logChannelList");
-    list.replaceChildren();
-    if (!statsSignedIn) {
-      const li = document.createElement("li");
-      li.className = "points-empty log-signed-out";
-      li.textContent = LOG_SIGNED_OUT;
-      list.append(li);
-      return;
-    }
-    const channels = [...DUMMY.channels].sort((a, b) => b.watchMs - a.watchMs || String(a.name).localeCompare(String(b.name), "ja"));
-    if (!channels.length) {
-      const li = document.createElement("li");
-      li.className = "points-empty";
-      li.textContent = "まだチャンネルの記録がありません。";
-      list.append(li);
-      return;
-    }
-    channels.forEach((ch, i) => {
-      const row = document.createElement("li");
-      row.className = "points-channel-row is-link log-channel-row";
-      const text = document.createElement("span");
-      text.className = "log-channel-text";
-      const name = document.createElement("span");
-      name.className = "points-channel-name";
-      name.textContent = ch.name; // 配信者名は外部由来なので textContent（innerHTML に入れない）
-      const meta = document.createElement("span");
-      meta.className = "log-channel-meta";
-      meta.append(
-        logText("span", "log-keep", `視聴 ${formatWatchDuration(ch.watchMs)}`),
-        document.createTextNode("・"),
-        logText("span", "log-keep", `コメント ${formatCount(ch.comments)}`),
-        document.createTextNode("・"),
-        logText("span", "log-keep", `激熱 ${formatCount(ch.fever)}回`),
-      );
-      text.append(name, meta);
-      row.append(channelAvatarEl(ch, i, "points-channel-avatar"), text);
-      row.addEventListener("click", () => openChannel(ch, i));
-      list.append(row);
-    });
-  }
-
   function renderLogRecords() {
     const body = document.getElementById("logRecordBody");
     body.replaceChildren();
@@ -3568,7 +3524,6 @@ const { createClient } = window.supabase;
   function renderLogKinds() {
     renderLogDaily();
     renderLogMonth();
-    renderLogChannels();
     renderLogRecords();
     renderLogWeekday();
     renderLogWeek();
@@ -3579,7 +3534,7 @@ const { createClient } = window.supabase;
 
   // ログのカードを折りたたみにする（最初は閉じている。ヒートマップのカードは開いたまま。2026-10-24）
   //   見出しを押すと、高さがなめらかに広がる。中身の要素は移すだけなので、ID も描く関数もそのまま
-  const LOG_FOLD_CARDS = ["logDailyCard", "logMonthCard", "logChannelCard", "logRecordCard", "logWeekdayCard", "logWeekCard", "logFeverTopCard", "logMilestoneCard", "tenureCard", "logCheerCard", "ledgerCard"];
+  const LOG_FOLD_CARDS = ["logDailyCard", "logMonthCard", "breakdownCard", "logRecordCard", "logWeekdayCard", "logWeekCard", "logFeverTopCard", "logMilestoneCard", "tenureCard", "logCheerCard", "ledgerCard"];
   function setLogFold(card, open) {
     if (!card) return;
     card.classList.toggle("is-open", open);
