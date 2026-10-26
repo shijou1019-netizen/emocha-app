@@ -1705,10 +1705,123 @@ const { createClient } = window.supabase;
     return "中心が 90 日前、外側が今日。ぐるっと 1 周が 30 日です。大きくて濃い点が、たくさん過ごした日です。";
   }
 
+  // ---------- 新しい見せ方その 2（2026-10-27 追加）: ラジアルバー・ファネル・箱ひげ・バブル表 ----------
+  // ラジアルバー: 上位 5 チャンネルを、同心円の弧の長さで比べる（満月の 3/4 が最大）
+  function drawRadialBar(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const list = vizTopChannels(metric, 5).filter((c) => c.name !== "その他");
+    if (!list.length) return "まだデータがありません。";
+    const max = list[0].value;
+    const cx = 200, cy = 125, sweep = Math.PI * 1.5;
+    const pt = (r, t) => [cx + r * Math.sin(t), cy - r * Math.cos(t)]; // t = 0 が真上、時計回り
+    list.forEach((c, i) => {
+      const r = 105 - i * 20;
+      const arc = (to, attrs) => {
+        const [x1, y1] = pt(r, 0), [x2, y2] = pt(r, to);
+        svg.append(svgEl("path", { d: `M${x1} ${y1}A${r} ${r} 0 ${to > Math.PI ? 1 : 0} 1 ${x2} ${y2}`, fill: "none", "stroke-linecap": "round", ...attrs }));
+      };
+      arc(sweep, { stroke: "rgba(128,128,160,0.18)", "stroke-width": 14 });
+      const len = Math.max(0.05, (c.value / max) * sweep);
+      const bar = svgEl("path", { class: "v-shape", fill: "none", stroke: vizColorOf(c.name, i), "stroke-width": 14, "stroke-linecap": "round" });
+      const [x1, y1] = pt(r, 0), [x2, y2] = pt(r, len);
+      bar.setAttribute("d", `M${x1} ${y1}A${r} ${r} 0 ${len > Math.PI ? 1 : 0} 1 ${x2} ${y2}`);
+      bar.addEventListener("click", () => vizPick(bar, `${c.name}: ${graphFormat(metric, c.value)}`));
+      svg.append(bar);
+      vizLabel(svg, `${shortName(c.name, 7)}  ${graphFormat(metric, c.value)}`, { class: "v-label v-label-day", x: cx - 6, y: cy - r + 4, "text-anchor": "end" });
+    });
+    return "チャンネルごとの弧の長さ比べ（上位 5 件）。外側ほど多いチャンネルで、弧が長いほどたくさんあります。";
+  }
+
+  // ファネル: 直近 90 日のうち、「見た日 → コメントした日 → 激熱があった日 → ポイントがあった日」が何日あったか
+  function drawFunnel(svg) {
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const days = vizDays(90, "watch");
+    const stages = [
+      { name: "90 日", n: 90, color: "rgb(150,162,205)" },
+      { name: "見た日", n: days.filter((d) => d.row && d.row.watchMs > 0).length, color: "#9aa8ff" },
+      { name: "コメントした日", n: days.filter((d) => d.row && d.row.commentCount > 0).length, color: "#c4a6ff" },
+      { name: "激熱があった日", n: days.filter((d) => d.row && d.row.feverCount > 0).length, color: "#ff8cc6" },
+      { name: "ポイントがあった日", n: days.filter((d) => d.row && d.row.channelPoints > 0).length, color: "#ffcf6b" },
+    ];
+    if (stages[1].n === 0) return "まだデータがありません。";
+    stages.forEach((s, i) => {
+      const w = Math.max(30, (s.n / 90) * 296);
+      const y = 8 + i * 47;
+      vizLabel(svg, s.name, { class: "v-label v-label-day", x: 160, y: y + 12, "text-anchor": "middle" });
+      const bar = svgEl("rect", { class: "v-shape", x: 160 - w / 2, y: y + 17, width: w, height: 24, rx: 8, fill: s.color });
+      bar.addEventListener("click", () => vizPick(bar, `${s.name}: ${s.n} 日（90 日のうち ${Math.round((s.n / 90) * 100)}%）`));
+      svg.append(bar);
+      vizLabel(svg, String(s.n), { class: "v-label v-label-on", x: 160, y: y + 34, "text-anchor": "middle" });
+    });
+    return "直近 90 日のうち、それぞれの日が何日あったか。下へ行くほど絞られます。";
+  }
+
+  // 箱ひげ: 直近 6 か月、月ごとの「日ごとの値」のばらつき。箱 = 真ん中の半分の日、中の線 = 真ん中の値、ひげ = 最小〜最大
+  function drawBox(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const keys = graphBuckets("month").slice(-6);
+    const per = keys.map((key) => DUMMY.activity.filter((r) => r.date.startsWith(key)).map((r) => vizDayValue(r, metric)).filter((v) => v > 0).sort((a, b) => a - b));
+    const max = Math.max(...per.map((a) => a[a.length - 1] || 0), 0);
+    if (max <= 0) return "まだデータがありません。";
+    const q = (a, p) => { const pos = (a.length - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos); return a[lo] + (a[hi] - a[lo]) * (pos - lo); };
+    const y = (v) => 200 - (v / max) * 170;
+    const colw = 296 / 6;
+    keys.forEach((key, i) => {
+      const a = per[i];
+      const cx = 12 + colw * i + colw / 2;
+      vizLabel(svg, graphKeyLabel("month", key), { x: cx, y: 218, "text-anchor": "middle" });
+      if (!a.length) return;
+      const col = vizColorOf("", i);
+      svg.append(svgEl("line", { x1: cx, x2: cx, y1: y(a[0]), y2: y(a[a.length - 1]), stroke: "rgba(128,128,160,0.7)", "stroke-width": 2 }));
+      const top = y(q(a, 0.75)), bot = y(q(a, 0.25));
+      const box = svgEl("rect", { class: "v-shape", x: cx - 15, y: top, width: 30, height: Math.max(3, bot - top), rx: 5, fill: col });
+      box.addEventListener("click", () => vizPick(box, `${graphKeyLabel("month", key)}: 最小 ${graphFormat(metric, a[0])}・真ん中 ${graphFormat(metric, q(a, 0.5))}・最大 ${graphFormat(metric, a[a.length - 1])}（${a.length} 日）`));
+      svg.append(box);
+      svg.append(svgEl("line", { x1: cx - 15, x2: cx + 15, y1: y(q(a, 0.5)), y2: y(q(a, 0.5)), stroke: "#2a2454", "stroke-width": 2.5 }));
+    });
+    return "月ごとの日々のばらつき。箱が高いほど日による差が大きく、中の線が「ふつうの日」の値です。";
+  }
+
+  // バブル表: 横 = 直近 12 週、縦 = 曜日。丸が大きい日ほど多かった日
+  function drawBubbleGrid(svg) {
+    const { metric } = vizState;
+    svg.setAttribute("viewBox", "0 0 320 250");
+    const byDate = new Map(DUMMY.activity.map((r) => [r.date, r]));
+    const wdToday = (new Date().getDay() + 6) % 7;
+    const startMs = Date.now() - (11 * 7 + wdToday) * 86_400_000;
+    const cells = [];
+    for (let w = 0; w < 12; w++) {
+      for (let d = 0; d < 7; d++) {
+        const ms = startMs + (w * 7 + d) * 86_400_000;
+        if (ms > Date.now()) continue;
+        const date = localDateString(ms);
+        const row = byDate.get(date);
+        cells.push({ w, d, date, value: row ? vizDayValue(row, metric) : 0 });
+      }
+    }
+    const max = Math.max(...cells.map((c) => c.value), 0);
+    if (max <= 0) return "まだデータがありません。";
+    "月火水木金土日".split("").forEach((n, d) => vizLabel(svg, n, { class: "v-label v-label-sub", x: 14, y: 40 + d * 28 + 4, "text-anchor": "middle" }));
+    cells.forEach((c) => {
+      const cx = 40 + c.w * 23.5, cy = 40 + c.d * 28;
+      const dot = svgEl("circle", {
+        class: "v-shape", cx, cy, r: c.value > 0 ? 3 + Math.sqrt(c.value / max) * 10 : 2,
+        fill: c.value > 0 ? vizRamp(0.3 + 0.7 * (c.value / max)) : "rgba(128,128,160,0.3)",
+      });
+      dot.addEventListener("click", () => vizPick(dot, `${vizShortDate(c.date)}: ${graphFormat(metric, c.value)}`));
+      svg.append(dot);
+    });
+    vizLabel(svg, "12 週前", { x: 40, y: 242 });
+    vizLabel(svg, "今週", { x: 40 + 11 * 23.5, y: 242, "text-anchor": "middle" });
+    return "横が週（右が今週）、縦が曜日。丸が大きく濃い日ほど、たくさん過ごした日です。";
+  }
+
   function renderViz() {
     const { type } = vizState;
     // 項目が決まっている図（バブル・達成リング・ストリーム・ポイントの流れ・ミニ推移・サンバースト）は、項目の切り替えを出さない
-    document.getElementById("vizMetric").hidden = ["bubble", "rings", "stream", "sankey", "multi", "sunburst", "scatter"].includes(type);
+    document.getElementById("vizMetric").hidden = ["bubble", "rings", "stream", "sankey", "multi", "sunburst", "scatter", "funnel"].includes(type);
     const svg = document.getElementById("vizSvg");
     svg.replaceChildren();
     vizSel = null;
@@ -1718,6 +1831,7 @@ const { createClient } = window.supabase;
       rings: drawRings, year: drawYear, stream: drawStream, sankey: drawSankey, multi: drawMulti,
       waffle: drawWaffle, ridge: drawRidge, sunburst: drawSunburst, punch: drawPunch, dumbbell: drawDumbbell, hist: drawHist,
       barcode: drawBarcode, scatter: drawScatter, ecg: drawEcg, constellation: drawConstellation, monthcal: drawMonthCal, meter: drawMeter, spiral: drawSpiral,
+      radialbar: drawRadialBar, funnel: drawFunnel, box: drawBox, bubblegrid: drawBubbleGrid,
     }[type];
     document.getElementById("vizNote").textContent = draw(svg);
   }
